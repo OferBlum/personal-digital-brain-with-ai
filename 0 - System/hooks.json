@@ -1,0 +1,12 @@
+{
+  "hooks": [
+    {
+      "event": "SessionStart",
+      "command": "Read Wikipedia/_cache.md for recent context. Then run SKILL-status to check for new files in Wikipedia/raw/. Also check Wikipedia/raw/youtube_queue.md for pending videos in the 'Pending' table. If there are uncompiled files or pending videos, ask the user: 'There are X new files and Y pending videos — do you want me to compile them?'"
+    },
+    {
+      "event": "SessionEnd",
+      "command": "Update Wikipedia/_cache.md with a summary of what was done this session, which pages were touched, and any open questions."
+    }
+  ]
+}
