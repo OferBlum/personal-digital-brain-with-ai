@@ -52,12 +52,6 @@ Drop any raw source (YouTube transcript, article text, notes) into `7 - Wikipedi
 
 The agent reads `SKILL-ingest.md`, extracts the key concepts, writes a structured wiki page, updates `index.md`, `log.md`, and `.manifest.json`, then cross-links the new page with existing ones.
 
-For YouTube videos specifically, add the URL to `youtube_queue.md` and run:
-```bash
-python3 "0 - System/youtube-fetch.py"
-```
-This downloads the transcript to `raw/` automatically.
-
 ### Querying the wiki
 Ask any question naturally:
 > "What do I know about [topic]?"
