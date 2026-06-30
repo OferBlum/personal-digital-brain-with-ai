@@ -5,19 +5,21 @@ After every ingest — to connect pages that mention each other but lack a wikil
 
 ## Steps
 
-### 1. Take the new page
-Identify the core concepts and entities in the newly created page.
+### 1. Preview (dry-run)
+```bash
+python3 "0 - System/scripts/autolink.py"
+```
+The script scans all pages in `7 - Wikipedia/`, identifies mentions of page titles that are not yet linked,
+and prints how many links will be added and in which pages. **Does not write anything.**
 
-### 2. Search for mentions
-Scan all pages in `7 - Wikipedia/` and look for places where:
-- The name of the new page is mentioned but not linked
-- Concepts from the new page are mentioned but not linked
+### 2. Apply
+After reviewing the preview and it looks reasonable:
+```bash
+python3 "0 - System/scripts/autolink.py" --apply
+```
+The script backs up to `.backup/` then writes the links.
 
-### 3. Add wikilinks
-Wherever you found a match — turn the text into a `[[wikilink]]`.
-
-### 4. Check reverse
-In the new page itself — add wikilinks to existing pages that are mentioned in it.
-
-### 5. Update log.md
-`## [YYYY-MM-DD] crosslink | [list of updated pages]`
+### 3. Update log.md
+```bash
+python3 "0 - System/scripts/append_log.py" --op crosslink --title "Auto-link" --pages "page-a,page-b"
+```

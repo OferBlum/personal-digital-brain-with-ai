@@ -5,25 +5,28 @@ When asked to check the wiki's status — what's compiled, what's pending, what 
 
 ## Steps
 
-### 1. Read manifest
-Read `7 - Wikipedia/.manifest.json`
+### 1. Refresh and build the manifest
+```bash
+python3 "0 - System/scripts/build_manifest.py"
+```
+The script scans sources and page frontmatter, and prints a list of all compiled sources (date → pages).
+This also updates the canonical `7 - Wikipedia/.manifest.json`.
 
-### 2. Scan raw/
-List all files in `7 - Wikipedia/raw/`
+### 2. Check source health
+```bash
+python3 "0 - System/scripts/wiki_sources_report.py"
+```
+Shows how many sources are healthy and how many have issues (missing targets, etc.).
 
-### 3. Calculate delta
-- Files already compiled ← in the manifest
-- New files not yet compiled ← in raw/ but not in the manifest
-- Files changed since compile ← modified date > ingest date in manifest
-
-### 4. Show report
+### 3. Show report
+Summarize from the output:
 ```
 📚 Total wiki pages: X
 ✅ Compiled sources: X
-🆕 Pending compilation: X
-🔄 Changed since compile: X
+⚠️ Sources with issues: X
 📅 Last compiled: YYYY-MM-DD
 ```
+New files in `raw/` that don't appear in the manifest output are candidates for compilation.
 
-### 5. Ask
+### 4. Ask
 "Do you want me to compile the pending sources?"

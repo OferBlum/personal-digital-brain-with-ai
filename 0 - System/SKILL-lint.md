@@ -5,32 +5,25 @@ When asked to do a health check on the wiki.
 
 ## Steps
 
-### 1. Orphaned pages
-Find pages in `7 - Wikipedia/` that have no incoming wikilinks from other pages.
-
-### 2. Broken links
-Find `[[wikilinks]]` that point to non-existent pages.
-
-### 3. Outdated information
-Find pages where `last_updated` is older than 30 days and their `wiki_sources` have changed.
-
-### 4. Contradictions
-Find pages with `provenance: ambiguous` that haven't been resolved yet.
-
-### 5. Missing concepts
-Find concepts that are mentioned in pages but don't have their own dedicated page.
-
-### 6. Missing frontmatter
-Find pages in `7 - Wikipedia/` that are missing frontmatter fields.
-
-### 7. Report
-Show summary:
+### 1. Run automated check
+```bash
+python3 "0 - System/scripts/validate.py"
 ```
-✅ Healthy pages: X
-⚠️ Orphaned pages: X
-🔗 Broken links: X
-📅 Outdated information: X
-❓ Missing concepts: X
-```
+The script checks on its own: missing frontmatter, broken links, outdated `last_compiled`, and required fields.
+It writes a full report to `7 - Wikipedia/validation_report.md` and prints an error/warning summary.
 
-Then ask: "Would you like me to fix each of these?"
+### 2. Check sources (wiki_sources)
+```bash
+python3 "0 - System/scripts/wiki_sources_report.py"
+```
+Identifies `wiki_sources` pointing to files/URLs that don't exist → `7 - Wikipedia/wiki_sources_issues.md`.
+Note: broken source links originating from external URLs or YouTube transcripts are acceptable — not a bug to fix.
+
+### 3. Missing concept candidates (optional)
+```bash
+python3 "0 - System/scripts/subject_candidates.py" 3
+```
+Shows concepts linked from ≥3 pages that could become a topic in SCHEMA. **Display only — Ofer decides.**
+
+### 4. Show summary and ask
+Show the error/warning counts from the reports, then ask: "Would you like me to handle each of these?"
