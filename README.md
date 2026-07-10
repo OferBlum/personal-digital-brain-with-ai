@@ -6,13 +6,16 @@ A personal knowledge base ("digital brain") that gets smarter every day, managed
 
 ## The Core Idea
 
-Two mechanisms drive the whole system:
+Three mechanisms drive the whole system:
 
 **1. The Karpathy method — the wiki as a living database.**
 Every external source I want to keep (YouTube videos, articles, PDFs) gets compiled into a structured concept page in `7 - Wikipedia/`. A `.manifest.json` tracks what was ingested, `log.md` keeps an append-only history, `index.md` is the master catalog, and `_cache.md` gives the agent instant context at the start of every session — without scanning the entire vault.
 
 **2. Lazy-loading skills — the agent only knows what it needs.**
 Instead of loading all rules upfront (which wastes context and causes hallucinations), everything is split into separate skill files under `0 - System/SKILL-*.md`. `CLAUDE.md` is just a router: it reads the request and loads only the relevant skill. `skills-index.md` is the single source of truth for what exists. This keeps the agent sharp and the system easy to extend — adding a capability = adding one SKILL file and one router line.
+
+**3. My own ideas — written by me, wired in by the system.**
+The wiki holds the world's knowledge; `2 - Notes/` holds *mine*. I write ideas, thoughts, and summaries as plain notes (quick captures from Hermes land there too), and agents are forbidden from rewriting them — they only enrich and connect. The wiring happens on three levels without me doing anything: every note's `subject:` frontmatter attaches it to a topic hub in `1 - Topics/`; `autolink.py` scans bidirectionally after every compile, so a note that mentions a wiki page gets a `[[wikilink]]` and vice versa; and every graph refresh must add bridge edges between my note concepts and the wiki concepts on the same topic. New notes even count toward the graph-refresh threshold, exactly like external sources. The result: an idea I jot down today is automatically linked to everything I've ever learned about it — my thinking and the compiled knowledge become one connected brain, while staying clearly separated on disk (mine vs. compiled) so the agent always knows what it may touch.
 
 ## Privacy — declared AND enforced
 
