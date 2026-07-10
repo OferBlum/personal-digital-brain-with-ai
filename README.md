@@ -2,7 +2,7 @@
 
 A personal knowledge base ("digital brain") that gets smarter every day, managed together by me and AI agents. One Obsidian vault, a lazy-loading skill system, an AI-maintained wiki (the **Karpathy method**), a semantic knowledge graph built with [graphify](https://github.com/sponsors/safishamsi), and hard privacy enforcement.
 
-> **The core principle: I write; the agents read and enrich — they don't write for me.**
+> **The core principle: I write my ideas; the agents read and enrich.**
 
 ## The Core Idea
 
