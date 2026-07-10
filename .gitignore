@@ -1,0 +1,24 @@
+# OS / editor noise
+.DS_Store
+__pycache__/
+*.pyc
+
+# Obsidian app state (workspace history, plugin binaries, machine-local config)
+.obsidian/
+
+# Derived artifacts — regenerated locally
+graphify-out/
+.graphifyignore
+7 - Wikipedia/.backup/
+7 - Wikipedia/.manifest.json
+7 - Wikipedia/validation_report.md
+7 - Wikipedia/wiki_sources_issues.md
+7 - Wikipedia/subject_candidates.md
+7 - Wikipedia/_cache-archive.md
+
+# Private surfaces — never published
+3 - Journal/*
+!3 - Journal/.gitkeep
+
+# Local machine settings
+.claude/settings.local.json

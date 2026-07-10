@@ -2,11 +2,11 @@
   "hooks": [
     {
       "event": "SessionStart",
-      "command": "Read Wikipedia/_cache.md for recent context. Then run SKILL-status to check for new files in Wikipedia/raw/. Also check Wikipedia/raw/youtube_queue.md for pending videos in the 'Pending' table. If there are uncompiled files or pending videos, ask the user: 'There are X new files and Y pending videos — do you want me to compile them?'"
+      "command": "Read 7 - Wikipedia/_cache.md for recent context. Then run SKILL-status to check for new files in 7 - Wikipedia/raw/. Also check 7 - Wikipedia/raw/youtube_queue.md for pending videos in the Pending table. If there are uncompiled files or pending videos, ask: 'There are X new files and Y pending videos — want me to compile them?'. Then run `python3 \"0 - System/scripts/autolink.py\"` (dry-run, covers both 7 - Wikipedia and 2 - Notes): if it reports unlinked mentions, ask 'There are X new links to connect between notes and the wiki — connect them?'; if it reports a name collision (a note and a wiki page with the same name), offer to rename the note (wiki page wins). Also run `python3 \"0 - System/scripts/check_graph_staleness.py\"` — if refresh_due, offer a graph refresh per SKILL-ingest step 10."
     },
     {
       "event": "SessionEnd",
-      "command": "Update Wikipedia/_cache.md with a summary of what was done this session, which pages were touched, and any open questions."
+      "command": "Update 7 - Wikipedia/_cache.md with a summary of what was done this session, which pages were touched, and any open questions. Then run `python3 \"0 - System/scripts/trim_cache.py\" 2` to keep only the 2 most recent sessions — older sessions are archived to _cache-archive.md automatically. Do NOT let _cache.md accumulate more than 2 sessions."
     }
   ]
 }

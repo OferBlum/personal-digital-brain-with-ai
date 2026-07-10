@@ -1,14 +1,9 @@
 ---
-Created: "{{date}} {{time}}"
-topic:
+subject:
 tags:
+background:
 private: false
----
-
-
-> [!ABSTRACT] Background
-> 
-
+created: "{{date}} {{time}}"
 ---
 
 # 📝 Content
@@ -17,6 +12,6 @@ private: false
 
 ---
 
-# ✅ Tasks to do
+# ✅ Tasks
 
 

@@ -1,11 +1,11 @@
 ---
-tags: [index]
+subject: "[[Wiki Index]]"
+tags:
+  - wiki
+  - index
 private: false
-created: YYYY-MM-DD
 ---
+# Wiki Index
 
-# Wikipedia Index
-
-| Page | Topic | Created | Sources |
-|------|-------|---------|---------|
-| | | | |
+| Page | Description | Last updated |
+|------|-------------|--------------|

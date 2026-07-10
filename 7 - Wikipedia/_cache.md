@@ -3,19 +3,7 @@ tags: [cache]
 private: false
 ---
 
-# Hot Cache
+# Session Cache
 
-<!-- This file is read at the start of every session and updated at the end. -->
-<!-- It gives the agent instant context without scanning the entire vault. -->
-
-## Last Session
-
-No sessions recorded yet.
-
-## Recently Touched Pages
-
-None.
-
-## Open Items
-
-None.
+> Hot context carried between sessions. Read at session start, updated at session end.
+> `trim_cache.py` keeps only the 2 most recent sessions here; older ones go to `_cache-archive.md`.

@@ -1,19 +1,19 @@
 ---
 tags:
   - "#daily_note"
-daily_rating:
-day_of_week:
+day_rating:
+weekday:
 ---
 # Insights
-# Tasks Completed
+# Tasks completed
 
-# Favorite/Key Moments
-# Daily Summary
+# Favorite/key moments
+# Day summary
 
 # Notes I worked on today
-~~~dataview  
-List  
-FROM ""  
-WHERE file.mday = date("<%tp.date.now('YYYY-MM-DD')%>") 
+~~~dataview
+List
+FROM ""
+WHERE file.mday = date("<%tp.date.now('YYYY-MM-DD')%>")
 SORT file.mtime asc
 ~~~
