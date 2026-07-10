@@ -53,5 +53,3 @@ My notes and the compiled pages are connected in two layers:
 - `hermes chat` — agent; inside: `/model local|claude|opus`, `/graphify query "..."`, `/exit`.
 - `python3 "0 - System/scripts/sync_skills_to_hermes.py" --apply` — sync skills after editing.
 
-# 🔗 Related
-- [[AIOS]] — the philosophy (File over AI)
