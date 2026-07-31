@@ -32,8 +32,13 @@ User identity: [[me]]. Full working rules: [[CLAUDE]]. Skill catalog: [[skills-i
 
 1. Never enter/read/mention a file inside `3 - Journal`.
 2. A file with `private: true` in frontmatter → treat as non-existent.
-3. A filename starting with `_` → skip without opening.
-4. Private subjects in `1 - Topics/` (flagged with `private:`) — respect the flag.
+3. Private subjects in `1 - Topics/` (flagged with `private:`) — respect the flag.
+
+That is the whole list, and it is enforced in code by `0 - System/scripts/privacy_guard.py`
+(one implementation, one thin wrapper per runtime).
+
+A filename starting with `_` is a **generated system file, not a secret**: skip it when
+indexing or compiling, but it is readable — `_cache.md` is required reading at session start.
 
 ## Where to write what (output routing)
 
@@ -47,8 +52,21 @@ User identity: [[me]]. Full working rules: [[CLAUDE]]. Skill catalog: [[skills-i
 - `7 - Wikipedia/index.md` — master catalog of the wiki pages.
 - `7 - Wikipedia/log.md` — append-only history.
 - `7 - Wikipedia/.manifest.json` — every source that was compiled.
-- `7 - Wikipedia/_cache.md` — cache from the last session (starts with `_` → read only via hooks at session start).
+- `7 - Wikipedia/_cache.md` — cache from the last session. Read it at session start (the `_` prefix means "generated", not "off-limits").
 
-## Retrieval index (Layer 2, additional)
+## Retrieval indexes (Layer 2, additional)
 
-Graphify builds a local graph index of the vault (excluding `3 - Journal` and `private: true`) in its own separate files — **in addition** to the wiki's index.md/manifest, not instead of them. Used for smart retrieval across a large vault.
+Two derived indexes sit on top of the markdown — **in addition** to the wiki's
+index.md/manifest, not instead of them. Both exclude `3 - Journal` and `private: true`.
+
+| Index | Question it answers | Built by |
+|---|---|---|
+| `graphify-out/` | **how things connect** — a semantic graph of concepts and their edges | `refresh_graph.sh` (Graphify) |
+| `vector-out/` | **what things mean** — meaning-based search that crosses languages and reaches `2 - Notes/` and `1 - Topics/`, not just the wiki | `embed_index.py` (bge-m3 via local Ollama) |
+
+Both are **gitignored and never published**: each one records real note paths, so the index
+files are effectively a list of your private note titles. Both are fully regenerable — the
+markdown is the source of truth.
+
+Everyday commands: `bash "0 - System/scripts/reindex.sh"` (incremental) and
+`python3 "0 - System/scripts/vsearch.py" "question"`.

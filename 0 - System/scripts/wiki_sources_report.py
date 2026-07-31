@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-wiki_sources_report.py — scans wiki_sources in every page, classifies each
-entry, and writes a report of the problems. Read-only, touches no page.
-Run this first, before making any changes.
+wiki_sources_report.py — scans wiki_sources on every page, classifies each entry,
+and writes a report of the problems. Read-only, never touches a page.
+Run this first in step 2, before making any change.
 """
 import sys
 from pathlib import Path
@@ -19,15 +19,15 @@ def classify(page_path, entry, md_index):
         inner = inner[2:-2].strip()
     status, target = V.resolve_link(inner, md_index)
     if status == "missing":
-        return ("🔴 missing target", f"`{inner}` — no such file found")
+        return ("🔴 missing target", f"`{inner}` — no such file")
     if status == "ambiguous":
         return ("🟠 ambiguous name", f"`{inner}` — several files with this name, needs a full path")
-    # ok — but maybe it points to itself or to another wiki page (not a real ingestion source)
+    # ok — but it may point at itself or at another wiki page (not a real ingestion source)
     if V.nfc(str(target)) == V.nfc(str(page_path)):
         return ("🟣 self-reference", f"`{inner}` — the page lists itself as a source")
     if V.WIKI in Path(target).parents and V.RAW not in Path(target).parents:
         return ("🔵 source is a wiki page", f"`{inner}` — probably a cross-link, not a real source")
-    return None  # valid (raw/ or a note)
+    return None  # fine (raw/ or a note)
 
 
 def main():
@@ -49,7 +49,8 @@ def main():
                 ok += 1
 
     lines = [
-        "---", "tags: [report]", "private: false", "---",
+        "---", "type: report", "subject:", "tags:", "  - report",
+        "private: false", "---",
         "# wiki_sources report", "",
         f"Generated: {V.today()} · valid entries: {ok} · problems: {len(rows)}", "",
     ]
@@ -58,12 +59,12 @@ def main():
         for name, kind, detail in rows:
             lines.append(f"| [[7 - Wikipedia/{name}]] | {kind} | {detail} |")
     else:
-        lines.append("✅ No problems — all wiki_sources are valid.")
+        lines.append("✅ No problems — every wiki_sources entry is valid.")
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(f"✅ valid entries: {ok}")
-    print(f"⚠️  problems recorded: {len(rows)}")
-    print(f"📄 report: {V.rel(REPORT)}")
+    print(f"✅ Valid entries: {ok}")
+    print(f"⚠️  Problems recorded: {len(rows)}")
+    print(f"📄 Report: {V.rel(REPORT)}")
     for name, kind, detail in rows:
         print(f"   {kind}  {name}: {detail}")
 

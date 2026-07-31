@@ -1,0 +1,101 @@
+# publish-manifest.example.yaml — the publish policy, as data.
+#
+# Copy this to `publish-manifest.yaml` (gitignored, machine-local) and edit the paths.
+# `publish_check.py` and `publish_port.py` both read it; `SKILL-publish.md` is only the
+# procedure around them.
+#
+# The point of this file: publishing used to be tribal knowledge spread across notes and
+# agent memory, which is exactly why the mirror drifted for weeks without anyone noticing.
+# Policy that lives in someone's head cannot be checked. Policy in a file can.
+#
+# ALLOWLIST SEMANTICS: nothing is published unless it matches `publish:`. The content
+# folders are absent by construction, so they cannot leak through an oversight — that is
+# a stronger guarantee than a denylist, which only blocks what you remembered to list.
+
+mirror: ~/path/to/your/public-repo-working-copy
+repo: github.com/you/your-public-repo
+
+# If your vault uses non-English folder names, map them here. If it doesn't, leave this
+# empty — everything else still works.
+folder_map:
+  "0 - System": "0 - System"
+
+# Likewise for non-English frontmatter keys.
+fm_key_map: {}
+
+# Files that get published. `src -> dst` renames on the way out.
+publish:
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - "0 - System/scripts/*.py"
+  - "0 - System/scripts/*.sh"
+  - "0 - System/list_tags.sh"
+  - "0 - System/youtube-fetch.py"
+  - "0 - System/hooks.json"
+  - "0 - System/SKILL-*.md"
+  - "0 - System/agents/wiki-librarian.md"
+  - ".claude/settings.json"
+  - ".claude/privacy-guard.py"
+  - ".claude/commands/*.md"
+  - ".claude/agents/*.md"
+  - "4 - Templates/Standard_Note.md"
+
+# Never published, each with the reason — this doubles as documentation for readers.
+exclude:
+  "0 - System/scripts/publish_check.py": "self-reference — the porter must not port itself"
+  "0 - System/scripts/publish_port.py": "self-reference"
+  "0 - System/publish-manifest.yaml": "contains your local mirror path"
+  "0 - System/memories/USER.md": "the ambient agent's data about you"
+  "0 - System/memories/MEMORY.md": "the ambient agent's data about you"
+  ".graphifyignore": "enumerates private note titles by path"
+  "vector-out/": "meta.json records every indexed note path"
+  "graphify-out/": "derived graph over private content"
+  ".claude/settings.local.json": "machine-local permissions"
+
+# Published, but hand-written as sanitized stubs — NEVER copied from the vault.
+placeholders:
+  "0 - System/me.md": "identity template only"
+  "0 - System/SCHEMA.md": "structure ports; the subject/tag vocabulary stays generic"
+  "0 - System/skills-index.md": "personal-domain rows removed"
+  "0 - System/vault-map.md": "structure ports; personal routing notes removed"
+  "7 - Wikipedia/index.md": "empty stub — the real index lists every page you've read"
+  "7 - Wikipedia/log.md": "empty stub — the real log is your ingest history"
+  "7 - Wikipedia/_cache.md": "empty stub"
+  "7 - Wikipedia/raw/youtube_queue.md": "empty stub — the real queue is watch history"
+
+# Published, but with a known intentional difference. NOT drift — the checker skips these.
+# Keep the reason precise, so a future reader can tell a deliberate divergence from a
+# missed port.
+sanitized: {}
+
+# Folders that ship as an empty .gitkeep boundary, never with content.
+gitkeep_only:
+  - "1 - Topics"
+  - "2 - Notes"
+  - "3 - Journal"
+  - "5 - Tables"
+  - "6 - Images"
+
+# --- leak audit ---
+# Terms that must not appear in the mirror. Put your own name, handles and home path here.
+leak_terms: [yourname, yourhandle, "your.email@example.com", "/Users/you"]
+
+# Known-good occurrences, as `file:substring`. Anything else blocks staging.
+leak_allow:
+  - "LICENSE:Copyright"
+  - "README.md:github.com/you/"
+
+# Files allowed to contain non-Latin characters. Empty = none, which is the strong default.
+hebrew_allow: []
+
+# Paths that must NOT exist in the mirror working tree at all.
+must_be_absent:
+  - ".graphifyignore"
+  - "vector-out"
+  - "graphify-out"
+  - ".claude/settings.local.json"
+  - "0 - System/memories/USER.md"
+  - "0 - System/memories/MEMORY.md"
+  - "7 - Wikipedia/.backup"
+  - "7 - Wikipedia/validation_report.md"
+  - "7 - Wikipedia/_cache-archive.md"

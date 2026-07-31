@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 build_index.py — generates index.md from the pages' frontmatter.
-Columns: Page (uniform full-path link) | Description (background) | Last updated (last_compiled).
-Requires fix_frontmatter.py to run first so every page has a background.
+Columns: Page (a uniform full-path link) | Description (background) | Last updated (last_compiled).
+Requires fix_frontmatter.py to have run first, so every page has a background.
 """
 import sys, re
 from pathlib import Path
@@ -13,19 +13,18 @@ import vaultlib as V
 INDEX = V.WIKI / "index.md"
 
 HEADER = [
-    '---', 'subject: "[[Wiki Index]]"', 'tags:', '  - wiki', '  - index',
-    'private: false', '---', '# Wiki Index', '',
+    '---', 'type: index', 'subject:', 'tags:', '  - wiki', '  - index',
+    'private: false', 'okf_version: "0.2"', '---', '# Wiki Index', '',
     '| Page | Description | Last updated |', '|------|-------------|--------------|',
 ]
 
 
 def get_date(meta):
-    return meta.get("last_compiled") or meta.get("updated") or ""
+    return meta.get("last_compiled") or meta.get("date updated") or ""
 
 
 def existing_descriptions():
-    """name(stem) -> description from the current index, as a fallback so
-    descriptions aren't lost."""
+    """name(stem) -> description from the current index, as a fallback so descriptions aren't lost."""
     out = {}
     if not INDEX.exists():
         return out
@@ -46,7 +45,7 @@ def main():
             missing_desc.append(name)
         rows.append((get_date(meta), name, desc))
 
-    # Sort: by date descending, then name
+    # Sort: by date descending, then by name
     rows.sort(key=lambda r: (r[0], r[1]), reverse=True)
 
     lines = list(HEADER)
@@ -56,7 +55,7 @@ def main():
     V.backup([INDEX], "index")
     INDEX.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(f"✅ Wrote index: {V.rel(INDEX)} ({len(rows)} pages)")
+    print(f"✅ Index written: {V.rel(INDEX)} ({len(rows)} pages)")
     if missing_desc:
         print(f"⚠️  Pages with no background (empty description): {', '.join(missing_desc)}")
 

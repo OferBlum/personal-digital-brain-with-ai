@@ -1,9 +1,11 @@
 ---
+type: note
 subject:
 tags:
 background:
 private: false
-created: "{{date}} {{time}}"
+generated_by: human:me
+generated_at: "{{date}}"
 ---
 
 # 📝 Content

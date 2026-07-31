@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-build_manifest.py — generates the single canonical manifest.
+build_manifest.py — generates a single canonical manifest.
 Merges three sources so no history is lost:
   1. the existing .manifest.json (array)
-  2. the old manifest.json (object.sources)
+  2. the older manifest.json (object.sources)
   3. whatever is derived from the pages' actual wiki_sources
 Writes to .manifest.json, and backs up + removes the duplicate manifest.json.
 """
@@ -18,7 +18,8 @@ OLD = V.WIKI / "manifest.json"           # the old/duplicate one
 
 
 def get_date(meta):
-    return meta.get("last_compiled") or meta.get("updated") or meta.get("created") or V.today()
+    return (meta.get("last_compiled") or meta.get("date updated")
+            or meta.get("date created") or V.today())
 
 
 def add(store, path, page, ingested):
@@ -83,9 +84,9 @@ def main():
         OLD.unlink()
         removed = True
 
-    print(f"✅ Wrote canonical manifest: {V.rel(DOT)} ({len(out)} sources)")
+    print(f"✅ Canonical manifest written: {V.rel(DOT)} ({len(out)} sources)")
     if removed:
-        print(f"🗑️  Removed duplicate: {V.rel(OLD)} (backed up to .backup/)")
+        print(f"🗑️  Removed the duplicate: {V.rel(OLD)} (backed up to .backup/)")
     print("   Sources:")
     for e in out:
         print(f"     {e['ingested']}  {e['path']}  →  {', '.join(e['pages_produced'])}")

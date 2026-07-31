@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 """
-sync_skills_to_hermes.py — one-way sync: vault SKILL-*.md  ->  ~/.hermes/skills/
+sync_skills_to_hermes.py — generate Hermes-format skills INSIDE the vault:
+vault SKILL-*.md  ->  <vault>/0 - System/hermes-skills/<category>/<slug>/SKILL.md
 
 The vault is the single source of truth. Each `0 - System/SKILL-*.md` is converted
-into a Hermes-compatible SKILL.md (agentskills.io format) under
-`~/.hermes/skills/<category>/<slug>/SKILL.md`.
+into an agentskills.io-format SKILL.md under `0 - System/hermes-skills/`.
+Hermes reads that folder LIVE via `skills.external_dirs` in ~/.hermes/config.yaml —
+there is no copy in ~/.hermes/skills (a copy there would shadow the live one).
 
-Claude Code keeps reading the original vault skills as-is (lazy-loaded via CLAUDE.md);
-this script only produces the Hermes copy. Editing the vault skill + re-running sync
-keeps Hermes up to date — no duplicate maintenance.
+Claude Code keeps reading the original vault skills as-is (lazy-loaded via AGENTS.md);
+this script only regenerates the Hermes-format rendition after a vault skill changes.
 
-Privacy: journal-summary is intentionally NOT synced (it touches the personal journal
-and must stay local/Claude-Code-only, never routed through Hermes' Telegram gateway).
+Privacy: a skill can be marked `skip` so it is never exported to Hermes. Use that for
+anything that must stay local / Claude-Code-only rather than routed through Hermes'
+gateway — see the `publish` entry below for the pattern.
+
+Note: this script only ever WRITES. It never prunes, so deleting a skill here does not
+remove an already-generated folder — delete that by hand.
 
 Usage:
   python3 "0 - System/scripts/sync_skills_to_hermes.py"          # dry-run (default)
@@ -26,37 +31,34 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 VAULT = SCRIPT_DIR.parent.parent
 SKILLS_SRC = VAULT / "0 - System"
-HERMES_SKILLS = Path.home() / ".hermes" / "skills"
+HERMES_SKILLS = SKILLS_SRC / "hermes-skills"
 
 # --- per-skill config: slug, category, tags, one-line description, skip? ---
-# description is the frontmatter `description` Hermes uses to decide when to invoke.
+# `desc` is the frontmatter `description` Hermes uses to decide when to invoke a skill.
 CONFIG = {
-    "SKILL-ingest.md":                 {"slug": "wiki-ingest",             "category": "knowledge", "tags": ["wiki", "ingest"],           "desc": "Compile an external source (URL/YouTube/raw) into a wiki page + update manifest/index/log."},
-    "SKILL-resolve.md":                {"slug": "wiki-resolve",            "category": "knowledge", "tags": ["wiki", "resolve"],          "desc": "Update existing wiki pages for contradictions/reinforcements/additions after an ingest; updates last_compiled."},
-    "SKILL-crosslink.md":              {"slug": "wiki-crosslink",          "category": "knowledge", "tags": ["wiki", "crosslink"],        "desc": "Automatically add wikilinks between wiki pages (dry-run then apply)."},
-    "SKILL-query.md":                  {"slug": "wiki-query",              "category": "knowledge", "tags": ["wiki", "query"],            "desc": "Answer questions from the wiki with citations and offer to save new knowledge."},
-    "SKILL-lint.md":                   {"slug": "wiki-lint",               "category": "knowledge", "tags": ["wiki", "lint"],             "desc": "Wiki health validation: frontmatter, broken links, stale pages, missing sources."},
-    "SKILL-status.md":                 {"slug": "wiki-status",             "category": "knowledge", "tags": ["wiki", "status"],           "desc": "Show the wiki's state — what was compiled, what's pending, what changed."},
-    "SKILL-investment-agent.md":       {"slug": "investment-agent",        "category": "investing", "tags": ["investing", "agent"],       "desc": "Investment desk head: quick-check on a ticker, sizing, and routing to sub-skills (IBKR + Playwright)."},
-    "SKILL-investment-fundamental.md": {"slug": "investment-fundamental",  "category": "investing", "tags": ["investing", "fundamental"], "desc": "Deep hedge-fund-style fundamental research: 5 layers, 26 dimensions."},
-    "SKILL-investment-graph.md":       {"slug": "investment-graph",        "category": "investing", "tags": ["investing", "technical"],   "desc": "Quantitative technical analysis: EMA, ATR, RSI, MACD, volume and chart patterns."},
-    "SKILL-investment-stop-loss.md":   {"slug": "investment-stop-loss",    "category": "investing", "tags": ["investing", "risk"],        "desc": "Precise stop-loss calculation from EMA150/ATR/Swing-Lows: Stop = Anchor − 1.5×ATR."},
-    "SKILL-investment-deep-analyze.md":{"slug": "investment-deep-analyze", "category": "investing", "tags": ["investing", "orchestrator"],"desc": "Full analysis: runs fundamental+technical+stop and synthesizes with a 14-point entry checklist."},
-    "SKILL-Nutrition-Advisor.md":      {"slug": "nutrition-advisor",       "category": "personal",  "tags": ["nutrition"],                "desc": "Nutrition coach based on the profile, macro targets and the food bank."},
-    "SKILL-personal-stylist.md":       {"slug": "personal-stylist",        "category": "personal",  "tags": ["style"],                    "desc": "Outfit advice from the existing wardrobe; spots gaps and considers the weather."},
-    # Intentionally skipped for privacy — journal stays local, never in Hermes:
-    "SKILL-journal-summary.md":        {"skip": True, "reason": "Touches the personal journal — stays local Ollama/Claude-Code, never routed through Hermes/Telegram."},
+    "SKILL-ingest.md":    {"slug": "wiki-ingest",    "category": "knowledge", "tags": ["wiki", "ingest"],      "desc": "Compile an external source (URL/YouTube/raw file) into a wiki page and update the manifest/index/log."},
+    "SKILL-resolve.md":   {"slug": "wiki-resolve",   "category": "knowledge", "tags": ["wiki", "resolve"],     "desc": "Update existing wiki pages for contradictions/reinforcements/additions after an ingest; refreshes last_compiled."},
+    "SKILL-crosslink.md": {"slug": "wiki-crosslink", "category": "knowledge", "tags": ["wiki", "crosslink"],   "desc": "Add wikilinks automatically between wiki pages and notes (dry-run, then apply)."},
+    "SKILL-query.md":     {"slug": "wiki-query",     "category": "knowledge", "tags": ["wiki", "query"],       "desc": "Answer questions from the wiki with citations, and offer to save newly learned knowledge."},
+    "SKILL-vsearch.md":   {"slug": "vault-search",   "category": "knowledge", "tags": ["search", "semantic"],  "desc": "Semantic search across the vault by meaning rather than by keyword — crosses languages and reaches notes and topics too."},
+    "SKILL-lint.md":      {"slug": "wiki-lint",      "category": "knowledge", "tags": ["wiki", "lint"],        "desc": "Validate wiki health: frontmatter, broken links, stale pages, missing sources."},
+    "SKILL-status.md":    {"slug": "wiki-status",    "category": "knowledge", "tags": ["wiki", "status"],      "desc": "Show the state of the wiki — what is compiled, what is pending, what changed."},
+    # Intentionally skipped: publishing performs git operations and a leak audit.
+    # That is deep work for Claude Code, not something to route through an ambient agent.
+    "SKILL-publish.md":   {"skip": True, "reason": "git + leak audit — Claude Code only, never Hermes."},
 }
 
-# Legacy section headers -> Hermes-recommended structure
+# Section headings -> the Hermes-recommended structure
 HEADER_MAP = {
     "When to use": "When to Use",
     "Steps": "Procedure",
+    "Pitfalls": "Pitfalls",
     "Common problems": "Pitfalls",
+    "Verification": "Verification",
 }
 
 PRIVACY_NOTE = (
-    "> Privacy: never touch `3 - Journal` or `private: true` files. "
+    "> Privacy: never touch `3 - Journal` or any file with `private: true`. "
     "The working directory must be the vault root.\n"
 )
 
@@ -119,13 +121,12 @@ def main():
             continue
         content = build_skill_md(cfg, src.read_text(encoding="utf-8"))
         dest = HERMES_SKILLS / cfg["category"] / cfg["slug"] / "SKILL.md"
-        rel = dest.relative_to(Path.home())
         if apply:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(content, encoding="utf-8")
-            print(f"  WROTE   ~/{rel}")
+            print(f"  WROTE   {dest.relative_to(VAULT)}")
         else:
-            print(f"  WOULD   ~/{rel}  ({len(content)} bytes)")
+            print(f"  WOULD   {dest.relative_to(VAULT)}  ({len(content)} bytes)")
         written += 1
 
     print(f"\nDone. {written} synced, {skipped} skipped, {missing} missing.")

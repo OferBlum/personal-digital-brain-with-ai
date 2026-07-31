@@ -26,10 +26,15 @@ from pathlib import Path
 VAULT = Path(__file__).resolve().parent.parent.parent
 GRAPH = VAULT / "graphify-out" / "graph.json"
 
+# U+0590-U+05FF is the Hebrew block, written as escapes so this file stays pure ASCII.
+# Kept as an explicit range so slugs survive non-Latin vaults; swap in your own
+# script's block if you write in another one.
+NON_SLUG_CHARS = re.compile(r"[^\w\u0590-\u05ff_-]")
+
 
 def slug(label):
     s = re.sub(r"\s+", "_", label.strip())
-    s = re.sub(r"[^\w֐-׿_-]", "", s)  # keep word chars + Hebrew
+    s = NON_SLUG_CHARS.sub("", s)  # keep word chars + non-Latin letters
     return "c_" + s.lower()[:60]
 
 

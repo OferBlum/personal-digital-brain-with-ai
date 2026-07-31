@@ -1,5 +1,6 @@
 ---
-subject: "[[Wiki Log]]"
+type: log
+subject:
 tags:
   - wiki
   - log

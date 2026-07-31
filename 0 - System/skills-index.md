@@ -1,14 +1,18 @@
 ---
+type: note
 subject:
 tags:
+  - ai
 background: The vault's skill catalog + each skill's trigger — single source of truth for skill registration
 private: false
 created: 2026-07-08
+generated_by: human:me
+generated_at: 2026-07-08
 ---
 
 # skills-index.md — The Skill Catalog
 
-> A Layer 2 core file of [[AIOS]]. Single source of truth for the skill list. The skills themselves in `0 - System/SKILL-*.md` are **lazy-loaded** — only when the request matches (see [[CLAUDE]]). When a skill is ported to Hermes, that's the format (SKILL.md) and the source stays here.
+> A Layer 2 core file of [[AIOS]]. Single source of truth for the skill list. The skills themselves in `0 - System/SKILL-*.md` are **lazy-loaded** — only when the request matches (see [[AGENTS]]). When a skill is ported to Hermes, that's the format (SKILL.md) and the source stays here.
 
 ## Knowledge & wiki maintenance
 
@@ -17,32 +21,26 @@ created: 2026-07-08
 | `SKILL-ingest` | "compile…" / a new source (URL, YouTube, raw) | Compile an external source into a wiki page + update manifest/index/log |
 | `SKILL-resolve` | after every ingest | Update existing pages for contradictions/reinforcements/additions; updates last_compiled |
 | `SKILL-crosslink` | after every ingest | Automatic [[wikilinks]] (dry-run → apply) |
-| `SKILL-query` | a general question about the vault | Answer from the wiki with citations + offer to save new knowledge |
+| `SKILL-query` | a general question about the vault | Semantic search first, then answer with citations + a confidence level |
+| `SKILL-vsearch` | "where did I write about…" / half-remembered phrasing | Meaning-based search across the whole vault; crosses languages; reaches notes and topics |
 | `SKILL-lint` | "health check" | Validation: frontmatter, broken links, stale pages, missing sources |
 | `SKILL-status` | "what's the wiki status?" / "what's pending?" | Health check: manifest, sources, compile state |
 
-## Personal
+## Maintenance
 
 | Skill | When to trigger | Role |
 |-------|-----------------|------|
-| `SKILL-journal-summary` | "summarize my week/journal" | Journal summary **on local Ollama only** — never through the Claude API or an external channel. Output: `2 - Notes/` with `private: true` |
-| `SKILL-personal-stylist` | style / clothes / outfits | Outfit advice from the existing wardrobe; spots gaps; considers the weather |
-| `SKILL-Nutrition-Advisor` | food / nutrition | Nutrition coach based on the profile, macro targets and the food bank |
+| `SKILL-publish` | "update the public repo" / "publish" | Port the system layer to the public mirror: drift report → mechanical port → leak audit → stage. Claude Code only — never exported to Hermes |
 
-## Investing
+## Personal skills live elsewhere
 
-`SKILL-investment-agent` is the entry point; it routes to the sub-skills or handles it directly.
-
-| Skill | When to trigger | Role |
-|-------|-----------------|------|
-| `SKILL-investment-agent` | investments / portfolio / stocks / "what about [ticker]?" | Investment desk head: quick-check, sizing, routing to sub-skills (IBKR + Playwright) |
-| `SKILL-investment-fundamental` | routed from agent | Hedge-fund-style fundamental research: 5 layers, 26 dimensions |
-| `SKILL-investment-graph` | routed from agent | Quantitative technical analysis: EMA, ATR, RSI, MACD, volume, patterns |
-| `SKILL-investment-stop-loss` | a stop-loss request | Precise stop calculation: `Stop = Anchor − 1.5×ATR` (not percentages) |
-| `SKILL-investment-deep-analyze` | "full analysis / deep dive" | Orchestrator: runs the three skills and synthesizes with a 14-point entry checklist |
+Domain skills (investing, nutrition, styling, journal summarization) are **deliberately not in
+this repo**. They are personal by nature, and each lives as its own standalone repo — see
+*Companion Repos* in the README. The pattern is what transfers, not the content: one
+`SKILL-*.md` file, one row in this table, one route in `AGENTS.md`.
 
 ## Notes
 
-- MCP routing (IBKR/Gmail etc.) stays on the Claude Code side; Hermes reads outputs from the vault.
+- MCP routing stays on the Claude Code side; Hermes reads outputs from the vault.
 - Never invent subjects or tags not in SCHEMA. If none fits → leave empty.
-- Links: [[me]] · [[vault-map]] · [[CLAUDE]]
+- Links: [[me]] · [[vault-map]] · [[AGENTS]]

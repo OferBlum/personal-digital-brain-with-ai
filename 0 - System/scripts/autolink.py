@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-autolink.py — automatically turn exact page-title mentions into [[wikilinks]].
-Bidirectional: scans both the wiki pages (7 - Wikipedia) and the notes
-(2 - Notes), linking title mentions from both corpora. On a name collision
-(a note and a wiki page with the same name) the wiki page wins, and the
-collision is reported so the note can be renamed.
-Deliberately conservative: skips frontmatter, headings (#), code blocks,
-already-linked text, and titles shorter than 3 characters. Only the fuzzy
-conceptual links are left to the agent.
+autolink.py — automatically links exact page-title mentions into [[wikilink]]s.
+Bidirectional: scans both the wiki pages (7 - Wikipedia) and the notes (2 - Notes),
+and links mentions of titles from either corpus. On a name collision (a note and a
+wiki page with the same name) the wiki page wins, and the collision is reported so
+you can rename the note.
+Deliberately conservative: skips frontmatter, headings (#), code blocks, text that
+is already linked, and titles shorter than 3 characters. Only the fuzzy conceptual
+links are left for the agent.
 
-Default: dry-run. With --apply: back up, then write.
+Default: dry-run. With --apply: backs up, then writes.
 """
 import sys, re
 from pathlib import Path
@@ -20,13 +20,18 @@ import vaultlib as V
 APPLY = "--apply" in sys.argv
 MIN_LEN = 3
 
-# An existing [[...]] segment — neutralized before linking so a substring
-# inside it doesn't get wrapped again
+# An existing [[...]] span — neutralized before linking so a substring inside it
+# doesn't get wrapped a second time.
 EXISTING_LINK = re.compile(r"\[\[[^\]]*\]\]")
+
+# Word-boundary class. \w already covers Latin, digits and underscore; the explicit
+# U+0590-U+05FF range adds the Hebrew block, written as escapes so this file stays
+# pure ASCII. Add your own script's block here if you write in another one.
+WORD_CHAR = r"[\w\u0590-\u05ff]"
 
 
 def link_body(body, targets, self_name):
-    """targets: list of (title, prefix) sorted longest-first."""
+    """targets: a list of (title, prefix) sorted longest-first."""
     changed = 0
     out_lines, in_code = [], False
     for line in body.splitlines():
@@ -36,8 +41,7 @@ def link_body(body, targets, self_name):
         if in_code or line.lstrip().startswith("#") or not line.strip():
             out_lines.append(line); continue
 
-        # Split the line into existing [[...]] segments (kept as-is) and
-        # plain-text segments (linked)
+        # Split the line into existing [[...]] spans (left as-is) and plain text spans (linked)
         parts, last = [], 0
         for m in EXISTING_LINK.finditer(line):
             parts.append((line[last:m.start()], False))
@@ -53,10 +57,9 @@ def link_body(body, targets, self_name):
             for t, prefix in targets:
                 if t == self_name or len(t) < MIN_LEN:
                     continue
-                # Replace occurrences that aren't part of a longer word
-                # (word boundary for Latin/Hebrew/digits)
+                # Replace an occurrence that isn't part of a longer word
                 pattern = re.compile(
-                    r"(?<![\wא-ת])" + re.escape(t) + r"(?![\wא-ת])"
+                    r"(?<!" + WORD_CHAR + r")" + re.escape(t) + r"(?!" + WORD_CHAR + r")"
                 )
                 def repl(m):
                     nonlocal changed
@@ -74,11 +77,10 @@ def main():
     wiki_titles = {V.nfc(p.stem) for p, _, _ in pages}
     note_titles = {V.nfc(p.stem) for p, _, _ in notes}
 
-    # Name collision: the wiki page wins — the note is removed from the
-    # link namespace and reported
+    # Name collision: the wiki page wins — the note stays out of the link space and is reported
     collisions = sorted(wiki_titles & note_titles)
     if collisions:
-        print("⚠️ Name collisions (wiki page wins — consider renaming the note):")
+        print("⚠️ Name collisions (the wiki page wins — consider renaming the note):")
         for c in collisions:
             print(f"   ⛔ {c}")
         note_titles -= wiki_titles
@@ -100,12 +102,12 @@ def main():
         print("✅ No unlinked mentions."); return
 
     total = sum(n for _, n, _, _ in planned)
-    print(f"{'🟢 writing' if APPLY else '🔍 dry-run'} — {total} links in {len(planned)} pages:")
+    print(f"{'🟢 writing' if APPLY else '🔍 dry-run'} — {total} links across {len(planned)} pages:")
     for p, n, _, _ in planned:
         print(f"   📄 {V.rel(p)}: {n} links")
 
     if not APPLY:
-        print("\nℹ️  Nothing written. To apply: python3 autolink.py --apply"); return
+        print("\nℹ️  Nothing was written. To run for real: python3 autolink.py --apply"); return
 
     dest = V.backup(touched, "autolink")
     for p, _, meta, new_body in planned:

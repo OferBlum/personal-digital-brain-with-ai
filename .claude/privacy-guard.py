@@ -1,30 +1,36 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import sys, json, unicodedata
+"""
+Claude Code adapter for the vault's canonical privacy guard.
 
-JOURNAL = "3 - Journal"
+The policy itself lives in the vault, in ONE place, shared by every runtime:
+    0 - System/scripts/privacy_guard.py
+This file only wires it to Claude Code's PreToolUse contract (stderr + exit 2).
+Do not put policy here — edit the canonical file instead, and every agent inherits it.
 
-def norm(s):
-    return unicodedata.normalize("NFC", s or "")
+Fails CLOSED: if the canonical guard cannot be found or loaded (e.g. the vault lives in
+a cloud-synced folder and is currently offline), the tool call is refused rather than
+silently allowed.
+"""
+import sys, importlib.util
+from pathlib import Path
+
+CANONICAL = Path(__file__).resolve().parents[1] / "0 - System" / "scripts" / "privacy_guard.py"
+
+
+def fail_closed(msg):
+    print(f"BLOCKED: {msg}", file=sys.stderr)
+    sys.exit(2)
+
+
+if not CANONICAL.is_file():
+    fail_closed(f"canonical privacy guard not found at {CANONICAL}")
 
 try:
-    data = json.load(sys.stdin)
-except Exception:
-    print("BLOCKED: privacy-guard could not parse tool input", file=sys.stderr)
-    sys.exit(2)
+    spec = importlib.util.spec_from_file_location("privacy_guard", CANONICAL)
+    guard = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(guard)
+except Exception as e:
+    fail_closed(f"canonical privacy guard failed to load: {e}")
 
-ti = data.get("tool_input", {}) or {}
-candidates = [
-    ti.get("file_path"),
-    ti.get("path"),
-    ti.get("command"),   # Bash
-    ti.get("pattern"),   # Grep / Glob
-    ti.get("glob"),
-]
-blob = norm(" ".join(c for c in candidates if c))
-
-if norm(JOURNAL) in blob:
-    print(f"BLOCKED: '{JOURNAL}' is off-limits (privacy rule)", file=sys.stderr)
-    sys.exit(2)
-
-sys.exit(0)
+sys.exit(guard.run_claude(sys.stdin.read()))

@@ -8,6 +8,7 @@ __pycache__/
 
 # Derived artifacts — regenerated locally
 graphify-out/
+vector-out/
 .graphifyignore
 7 - Wikipedia/.backup/
 7 - Wikipedia/.manifest.json
@@ -17,8 +18,14 @@ graphify-out/
 7 - Wikipedia/_cache-archive.md
 
 # Private surfaces — never published
+# Note: graphify-out/, vector-out/ and .graphifyignore are above for a privacy reason,
+# not just because they are derived — each one enumerates real note paths or titles.
 3 - Journal/*
 !3 - Journal/.gitkeep
+home.html
+github-recovery-codes.txt
+0 - System/memories/*.lock
 
 # Local machine settings
 .claude/settings.local.json
+0 - System/publish-manifest.yaml

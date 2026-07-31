@@ -36,6 +36,7 @@ Leave the noise out — don't include every detail.
 - Create or update a page in `7 - Wikipedia/` with frontmatter:
 ```
 ---
+type: wiki-page
 subject: "[[subject-name]]"
 tags:
   - wiki
@@ -45,12 +46,24 @@ wiki_sources:
   - "[[raw/file-name]]"
 provenance: extracted
 last_compiled: YYYY-MM-DD
+generated_by: process:ingest
+generated_at: YYYY-MM-DD
 ---
 ```
 
 - ⚠️ Mandatory: every wikilink in YAML must be wrapped in double quotes `"[[...]]"`.
+- **`type` is the one field OKF requires** — `validate.py` errors without it. For a compiled
+  wiki page the value is always `wiki-page` (the full list is in SCHEMA.md).
+- `generated_by` / `generated_at` are **two flat keys**, never a nested `generated:` map —
+  Obsidian Properties renders only flat values, and a map swallows both rows.
+  `generated_at` is the same date as `last_compiled`.
+- **Do not write `verified`.** Its absence means "unverified", which is the honest state for a
+  page compiled automatically that nobody has read yet. It gets stamped later via `okf_verify.py`.
+- **Do not write `status`.** The OKF default is `stable`; writing a default out is noise.
+- The key order above is what `vaultlib.dump_fm` produces (`PREFERRED_KEYS`) — keep it, so a
+  script that rewrites the page later doesn't produce a spurious diff.
 - `wiki_sources` with more than one source — a list, not comma-separated.
-- Use only subjects/tags that exist in `0 - System/SCHEMA.md`
+- Use only subjects/tags/types that exist in `0 - System/SCHEMA.md`
 
 ### 5. Mark provenance
 - `extracted` — information taken directly from the source

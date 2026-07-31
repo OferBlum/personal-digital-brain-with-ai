@@ -4,8 +4,10 @@ tags:
   - wiki
 background: Usage guide — how to operate and maintain the wiki correctly (compiling, queries, health, scripts)
 private: false
-last_compiled: 2026-06-30
 provenance: inferred
+last_compiled: 2026-06-30
+generated_by: human:me
+generated_at: 2026-06-30
 created: 2026-06-30
 ---
 
@@ -86,7 +88,12 @@ They live in `0 - System/scripts/`. You don't need to run them manually — Clau
 
 - `3 - Journal/` — absolutely out of bounds. The wiki never touches the journal.
 - A file with `private: true` — treated as non-existent.
-- A file whose name starts with `_` — skipped.
+
+Those two rules are the whole policy, and both are enforced in code by
+`0 - System/scripts/privacy_guard.py`.
+
+A file whose name starts with `_` is a generated system file, not a secret — it is skipped
+when indexing and compiling, but it is readable (`_cache.md` is read every session).
 
 ---
 

@@ -8,9 +8,8 @@ graph build. If the delta reaches THRESHOLD, it's time to refresh the graph.
   python3 check_graph_staleness.py         # report delta + whether a refresh is due
   python3 check_graph_staleness.py --mark  # record current count (call after a build)
 
-Refresh policy: both extraction and community naming are done by Claude Code on
-the Pro subscription — never the raw API, and never Ollama for extraction (too
-weak). refresh_graph.sh (Ollama) is a full-rebuild fallback only.
+Trigger policy: the refresh runs with OLLAMA (free) for extraction; Claude-quality
+community names are done by Claude Code on the Pro subscription — never the API.
 """
 import json
 import sys
@@ -19,15 +18,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
-THRESHOLD = 5  # number of new sources that triggers a graph refresh — change here
+THRESHOLD = 5  # how many new sources trigger a graph refresh — change it here
 
-MANIFEST = V.WIKI / ".manifest.json"
-COUNT_FILE = V.VAULT / "graphify-out" / ".graph_source_count"
+VAULT = Path(__file__).resolve().parent.parent.parent
+MANIFEST = VAULT / "7 - Wikipedia" / ".manifest.json"
+COUNT_FILE = VAULT / "graphify-out" / ".graph_source_count"
 
 
 def source_count() -> int:
-    # wiki sources (manifest) + non-private notes — a new note counts toward
-    # the refresh threshold just like a source
+    # Wiki sources (manifest) + non-private notes — a new note counts toward the
+    # refresh threshold exactly like an external source.
     try:
         m = json.loads(MANIFEST.read_text(encoding="utf-8"))
         wiki = len(m) if isinstance(m, list) else len(m.get("sources", m))
@@ -59,7 +59,7 @@ def main():
     print(json.dumps({"sources": cur, "since_last_build": delta,
                       "threshold": THRESHOLD, "refresh_due": due}, ensure_ascii=False))
     if due:
-        print(f"⚠️ {delta} new sources since the last graph build (threshold {THRESHOLD}) — consider refreshing the graph.")
+        print(f"⚠️ {delta} new sources since the last graph build (threshold {THRESHOLD}) — time to refresh the graph.")
 
 
 if __name__ == "__main__":

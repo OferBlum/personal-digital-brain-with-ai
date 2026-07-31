@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 trim_cache.py — keeps only the N most recent sessions in _cache.md,
-pushing older ones to _cache-archive.md. Default: N=2.
+and pushes the older ones into _cache-archive.md. Default: N=2.
 Usage: python3 trim_cache.py [N]
 """
 import sys, re
@@ -20,7 +20,7 @@ def main():
         print("ℹ️  No _cache.md.")
         return
     text = CACHE.read_text(encoding="utf-8")
-    # split into header + blocks by "## Session"
+    # Split into header + blocks on "## Session"
     parts = re.split(r"(?m)^(?=## Session)", text)
     header = parts[0]
     blocks = parts[1:]

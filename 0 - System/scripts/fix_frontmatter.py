@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-fix_frontmatter.py — cleans up frontmatter in 7 - Wikipedia/ pages:
-  • unifies the date field to last_compiled (converts updated/created if present)
-  • fills background from hand-written descriptions in the old index.md
-    (so the index becomes fully derived)
+fix_frontmatter.py — cleans up frontmatter on 7 - Wikipedia/ pages:
+  • consolidates the date field into last_compiled (converting date updated/date created)
+  • fills `background` from the hand-written descriptions in the old index.md
+    (so the index becomes a derived file rather than a hand-maintained one)
   • ensures required fields: tags includes wiki, private exists
   • quotes wikilinks in YAML
 
@@ -18,6 +18,8 @@ import vaultlib as V
 
 INDEX = V.WIKI / "index.md"
 APPLY = "--apply" in sys.argv
+
+DATE_ALIASES = ("date updated", "date created")
 
 
 def index_descriptions():
@@ -38,12 +40,12 @@ def fix_one(meta, desc_map, name):
     changes = []
     # 1. date → last_compiled
     if "last_compiled" not in meta:
-        for old in ("updated", "created"):
+        for old in DATE_ALIASES:
             if old in meta:
                 meta["last_compiled"] = meta.pop(old)
                 changes.append(f"date: {old} → last_compiled")
                 break
-    for old in ("updated", "created"):
+    for old in DATE_ALIASES:
         if old in meta:
             meta.pop(old)
             changes.append(f"removed duplicate field: {old}")
@@ -54,7 +56,7 @@ def fix_one(meta, desc_map, name):
             meta["background"] = d
             changes.append("background: filled from the index")
         else:
-            changes.append("background: missing (not in index — fill manually)")
+            changes.append("background: missing (not in the index — fill it in by hand)")
     # 3. tags includes wiki
     tags = meta.get("tags")
     if isinstance(tags, str):
@@ -96,7 +98,7 @@ def main():
             print(f"     • {c}")
 
     if not APPLY:
-        print("\nℹ️  Nothing written. To apply: python3 fix_frontmatter.py --apply")
+        print("\nℹ️  Nothing was written. For a real run: python3 fix_frontmatter.py --apply")
         return
 
     dest = V.backup(touched_paths, "frontmatter")

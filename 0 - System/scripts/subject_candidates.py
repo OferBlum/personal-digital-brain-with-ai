@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 subject_candidates.py — finds candidates for promotion to a subject:
-a concept that is linked ([[X]]) from ≥N different pages and is not already
-a subject in SCHEMA. Solves "I forgot to promote" — the system suggests,
-you approve. Read-only.
+a concept linked ([[X]]) from >=N different pages that isn't already a subject in SCHEMA.
+Solves "I forgot to promote it" — the system suggests, you approve. Read-only.
 Usage: python3 subject_candidates.py [N]   (default N=3)
 """
 import sys, re
@@ -40,16 +39,17 @@ def main():
 
     cands = []
     for tgt, pgs in refs.items():
-        if len(pgs) < N:                       continue
+        if len(pgs) < N:                        continue
         if tgt in subs:                         continue   # already a subject
         cands.append((len(pgs), tgt, sorted(pgs)))
     cands.sort(reverse=True)
 
-    lines = ["---", "tags: [report]", "private: false", "---",
+    lines = ["---", "type: report", "subject:", "tags:", "  - report",
+             "private: false", "---",
              "# Subject promotion candidates", "",
-             f"Generated: {V.today()} · threshold: ≥{N} mentions · found: {len(cands)}", ""]
+             f"Generated: {V.today()} · threshold: >={N} mentions · found: {len(cands)}", ""]
     if cands:
-        lines.append("> Concepts that recur across many pages but are not a subject in SCHEMA. Add to SCHEMA if you want.")
+        lines.append("> Concepts that recur across many pages but aren't a subject in SCHEMA. Add them to SCHEMA if you want them.")
         lines.append("")
         for cnt, tgt, pgs in cands:
             is_page = "📄 (exists as a page)" if tgt in page_names else "💡 (concept)"
@@ -58,7 +58,7 @@ def main():
         lines.append("✅ No candidates above the threshold.")
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(f"💡 Promotion candidates (≥{N}): {len(cands)} · 📄 {V.rel(REPORT)}")
+    print(f"💡 Promotion candidates (>={N}): {len(cands)} · 📄 {V.rel(REPORT)}")
     for cnt, tgt, _ in cands:
         print(f"   {cnt}×  {tgt}")
 
