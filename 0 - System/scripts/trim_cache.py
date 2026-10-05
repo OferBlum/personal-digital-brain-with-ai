@@ -10,8 +10,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
-CACHE = V.WIKI / "_cache.md"
-ARCHIVE = V.WIKI / "_cache-archive.md"
+CACHE = V.SYS / "_cache.md"
+ARCHIVE = V.SYS / "_cache-archive.md"
 KEEP = int(sys.argv[1]) if len(sys.argv) > 1 else 2
 
 
@@ -35,7 +35,7 @@ def main():
     CACHE.write_text(header + "".join(keep_blocks), encoding="utf-8")
 
     prev = ARCHIVE.read_text(encoding="utf-8") if ARCHIVE.exists() else \
-        "---\ntags: [cache, archive]\nprivate: false\n---\n\n# Cache Archive\n\n"
+        "---\ntags: [cache, archive]\n---\n\n# Cache Archive\n\n"
     ARCHIVE.write_text(prev + "".join(archive_blocks), encoding="utf-8")
 
     print(f"✅ Kept {KEEP} sessions in _cache.md, archived {len(archive_blocks)}.")

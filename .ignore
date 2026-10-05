@@ -1,0 +1,4 @@
+# Read by ripgrep (and so by Claude Code's Grep/Glob tools) even outside a git repo.
+# Privacy is folder-only: the private folder (the only top-level folder named "3 - …")
+# is never listed or searched. Policy: 0 - System/scripts/privacy_guard.py
+/3 - */

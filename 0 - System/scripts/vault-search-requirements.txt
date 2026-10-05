@@ -1,0 +1,3 @@
+# Python dependencies for the semantic vault search scripts, isolated from Hermes.
+numpy==2.3.5
+PyYAML==6.0.3

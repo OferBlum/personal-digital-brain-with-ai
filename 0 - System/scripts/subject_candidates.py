@@ -45,7 +45,7 @@ def main():
     cands.sort(reverse=True)
 
     lines = ["---", "type: report", "subject:", "tags:", "  - report",
-             "private: false", "---",
+             "---",
              "# Subject promotion candidates", "",
              f"Generated: {V.today()} · threshold: >={N} mentions · found: {len(cands)}", ""]
     if cands:

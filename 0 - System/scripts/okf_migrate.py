@@ -112,8 +112,6 @@ def iter_targets():
             meta, body = V.read_page(p)
             if not meta:
                 continue                           # a file with no frontmatter — leave it alone
-            if str(meta.get("private", "")).lower() == "true":
-                continue                           # privacy rule 2
             yield p, meta, body
 
 

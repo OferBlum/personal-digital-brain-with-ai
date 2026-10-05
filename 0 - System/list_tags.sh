@@ -13,10 +13,10 @@ LETTERS="$(printf '\xd7\x90')-$(printf '\xd7\xaa')A-Za-z"
 # Privacy exclusions: the journal folder and generated _ files (not secrets — just not tags)
 GREP_EXCLUDES=(--exclude-dir='3 - Journal' --exclude='_*')
 
-# Allowed file list: all md except the exclusions above and files with private: true
+# Allowed file list: all md except the exclusions above (the boundary is folder-only)
 FILES=()
 while IFS= read -r f; do FILES+=("$f"); done < <(
-  grep -rLE '^private:[[:space:]]*true' "$VAULT_ROOT" --include="*.md" "${GREP_EXCLUDES[@]}" 2>/dev/null
+  grep -rl -e '' "$VAULT_ROOT" --include="*.md" "${GREP_EXCLUDES[@]}" 2>/dev/null
 )
 [ ${#FILES[@]} -eq 0 ] && exit 0
 

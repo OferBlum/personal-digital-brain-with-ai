@@ -52,9 +52,6 @@ def stamp(paths):
         if not meta:
             print(f"  ⚠️  no frontmatter: {V.rel(p)}")
             continue
-        if str(meta.get("private", "")).lower() == "true":
-            print(f"  ⛔ private file: {V.rel(p)}")
-            continue
         entry = {"by": ACTOR, "at": V.today()}
         ver = meta.get("verified") or []
         if not isinstance(ver, list):

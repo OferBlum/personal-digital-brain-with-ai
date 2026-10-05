@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-vsearch.py — semantic search across the vault. Answers "what relates to this meaning",
-not "where does this word appear".
+vsearch.py — semantic search over the vault. Answers "what relates to this meaning",
+not "where is this word".
 
-This is what wasn't possible before:
-    vsearch "volume"          → finds a page that says "Anchored Volume Profile"
-    vsearch "vector database" → finds the page even if it's titled in another language
-    vsearch "how I learn"     → finds notes in 2 - Notes that the query skill never reached
+What this makes possible that wasn't before:
+    vsearch "<the word in another language>" → finds a page that says "Anchored Volume Profile" in English
+    vsearch "vector database"                → finds the page titled in the vault's other language
+    vsearch "how do I learn"                 → finds notes in 2 - Notes, which the query skill never reached
 
 Usage:
     python3 "0 - System/scripts/vsearch.py" "question"
     python3 "0 - System/scripts/vsearch.py" "question" --k 5 --folder "2 - Notes"
-    python3 "0 - System/scripts/vsearch.py" "question" --json      # for programmatic use
-    python3 "0 - System/scripts/vsearch.py" "question" --files     # paths only, for reading
+    python3 "0 - System/scripts/vsearch.py" "question" --json      # a JSON array of paths only
+    python3 "0 - System/scripts/vsearch.py" "question" --files     # compatibility: paths only
 """
 import sys, os, json, argparse, urllib.request
 from pathlib import Path
@@ -21,18 +21,26 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 import numpy as np
+import safe_input as S
+import embed_index as I
 
 OUT    = V.VAULT / "vector-out"
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 
 
 def load():
-    meta_p = OUT / "meta.json"
-    if not meta_p.exists():
+    # Legacy indexes are opaque; only the current schema is read.
+    base, meta = I.active()
+    if not base:
         sys.exit('No semantic index. Run: python3 "0 - System/scripts/embed_index.py"')
-    meta = json.loads(meta_p.read_text(encoding="utf-8"))
-    vecs = np.load(OUT / "vectors.npy")
-    recs = [json.loads(l) for l in (OUT / "chunks.jsonl").read_text(encoding="utf-8").splitlines()]
+    vecs = np.load(base / 'vectors.npy', allow_pickle=False)
+    recs = [json.loads(l) for l in (base / 'chunks.jsonl').read_text(encoding='utf-8').splitlines()]
+    if len(recs) != len(vecs):
+        sys.exit('Corrupt index')
+    keep = [i for i, r in enumerate(recs) if S.permitted(r['path'])
+            and r.get('body_hash') == meta.get('considered', {}).get(r['path'])]
+    vecs = vecs[keep]
+    recs = [recs[i] for i in keep]
     return meta, vecs, recs
 
 
@@ -48,24 +56,27 @@ def embed_query(q, model):
     return v / max(float(np.linalg.norm(v)), 1e-9)
 
 
-def search(q, k=8, folder=None, per_file=2):
+def search(q, k=8, folder=None):
     meta, vecs, recs = load()
+    if not recs:
+        return []
     qv = embed_query(q, meta["model"])
     scores = vecs @ qv                       # normalized → inner product = cosine
     order = np.argsort(-scores)
 
-    hits, seen = [], {}
+    hits, seen = [], set()
     for i in order:
         r = recs[i]
         if folder and not r["path"].startswith(folder):
             continue
-        if seen.get(r["path"], 0) >= per_file:   # don't flood with every chunk of one page
+        if r['path'] in seen:
             continue
-        seen[r["path"]] = seen.get(r["path"], 0) + 1
-        hits.append({**r, "score": round(float(scores[i]), 4)})
+        seen.add(r['path'])
+        hits.append(r['path'])
         if len(hits) >= k:
             break
-    return hits
+    # Re-check at output time; only paths cross the search API boundary.
+    return [path for path in hits if S.permitted(path)]
 
 
 def main():
@@ -82,24 +93,10 @@ def main():
     if args.json:
         print(json.dumps(hits, ensure_ascii=False, indent=2))
         return
-    if args.files:
-        seen = []
-        for h in hits:
-            if h["path"] not in seen:
-                seen.append(h["path"])
-        print("\n".join(seen))
-        return
-
-    if not hits:
+    if not hits and not args.files:
         print("Nothing found.")
         return
-    for h in hits:
-        head = f" › {h['heading']}" if h["heading"] else ""
-        print(f"\n{h['score']:.3f}  [[{h['path'][:-3]}]]{head}")
-        if h.get("background"):
-            print(f"        {h['background'][:110]}")
-        snippet = " ".join(h["text"].split())[:180]
-        print(f"        {snippet}…")
+    print("\n".join(hits))
 
 
 if __name__ == "__main__":

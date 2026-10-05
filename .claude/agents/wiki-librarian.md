@@ -6,7 +6,7 @@ description: >-
   cross-link pages, resolve against existing pages, lint / health check,
   status, and YouTube-queue compilation. Delegate here whenever the request
   is about turning raw sources into wiki pages or maintaining the wiki.
-  Do NOT use for personal-assistant tasks (any domain skill the user has
+  Do NOT use for personal-assistant tasks (personal-domain skills, the
   journal) — those stay with the main agent.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet

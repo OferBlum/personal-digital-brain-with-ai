@@ -60,7 +60,7 @@ placeholders:
   "0 - System/vault-map.md": "structure ports; personal routing notes removed"
   "7 - Wikipedia/index.md": "empty stub — the real index lists every page you've read"
   "7 - Wikipedia/log.md": "empty stub — the real log is your ingest history"
-  "7 - Wikipedia/_cache.md": "empty stub"
+  "0 - System/_cache.md": "empty stub"
   "7 - Wikipedia/raw/youtube_queue.md": "empty stub — the real queue is watch history"
 
 # Published, but with a known intentional difference. NOT drift — the checker skips these.
@@ -98,4 +98,4 @@ must_be_absent:
   - "0 - System/memories/MEMORY.md"
   - "7 - Wikipedia/.backup"
   - "7 - Wikipedia/validation_report.md"
-  - "7 - Wikipedia/_cache-archive.md"
+  - "0 - System/_cache-archive.md"

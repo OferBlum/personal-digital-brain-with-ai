@@ -89,7 +89,9 @@ writing a default out is churn, so don't:
 Obsidian Properties renders only flat scalars and lists, so a nested map swallows both rows.
 
 Also on every file: `background` (a one-line description that doubles as the cross-language
-bridge for semantic search), `private` (the privacy flag), and `created`.
+bridge for semantic search). There is no separate creation-date key — `generated_at` carries it.
+`private` is retired: privacy is folder-only, so don't add the key (an existing `private: false`
+is a harmless leftover).
 
 ## Running it
 

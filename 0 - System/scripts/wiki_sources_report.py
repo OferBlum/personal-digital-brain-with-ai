@@ -50,7 +50,7 @@ def main():
 
     lines = [
         "---", "type: report", "subject:", "tags:", "  - report",
-        "private: false", "---",
+        "---",
         "# wiki_sources report", "",
         f"Generated: {V.today()} · valid entries: {ok} · problems: {len(rows)}", "",
     ]

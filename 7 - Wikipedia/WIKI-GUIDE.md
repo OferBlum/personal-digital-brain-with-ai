@@ -86,11 +86,11 @@ They live in `0 - System/scripts/`. You don't need to run them manually — Clau
 
 ## Privacy rules (always apply)
 
-- `3 - Journal/` — absolutely out of bounds. The wiki never touches the journal.
-- A file with `private: true` — treated as non-existent.
+- `3 - Journal/` (the journal + every private file) — absolutely out of bounds, never even listed.
+  The wiki never touches it.
 
-Those two rules are the whole policy, and both are enforced in code by
-`0 - System/scripts/privacy_guard.py`.
+That one folder is the whole policy (the old `private: true` flag is retired and grants
+nothing), and it is enforced in code by `0 - System/scripts/privacy_guard.py`.
 
 A file whose name starts with `_` is a generated system file, not a secret — it is skipped
 when indexing and compiling, but it is readable (`_cache.md` is read every session).

@@ -32,7 +32,7 @@ def main():
     if LOG.exists():
         text = LOG.read_text(encoding="utf-8")
     else:
-        text = "---\ntype: log\nsubject:\ntags:\n  - wiki\n  - log\nprivate: false\n---\n\n# Wiki Log\n"
+        text = "---\ntype: log\nsubject:\ntags:\n  - wiki\n  - log\n---\n\n# Wiki Log\n"
 
     # Inject right after the "# Wiki Log" heading
     marker = "# Wiki Log"

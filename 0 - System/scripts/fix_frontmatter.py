@@ -5,7 +5,7 @@ fix_frontmatter.py — cleans up frontmatter on 7 - Wikipedia/ pages:
   • consolidates the date field into last_compiled (converting date updated/date created)
   • fills `background` from the hand-written descriptions in the old index.md
     (so the index becomes a derived file rather than a hand-maintained one)
-  • ensures required fields: tags includes wiki, private exists
+  • ensures required fields: tags includes wiki
   • quotes wikilinks in YAML
 
 Default: dry-run (writes nothing, just shows what would change).
@@ -69,10 +69,6 @@ def fix_one(meta, desc_map, name):
         changes.append("tags: added wiki")
     elif "tags" not in meta:
         meta["tags"] = tags
-    # 4. private exists
-    if "private" not in meta:
-        meta["private"] = "false"
-        changes.append("private: added false")
     return changes
 
 

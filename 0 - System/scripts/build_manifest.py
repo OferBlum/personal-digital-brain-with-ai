@@ -18,8 +18,7 @@ OLD = V.WIKI / "manifest.json"           # the old/duplicate one
 
 
 def get_date(meta):
-    return (meta.get("last_compiled") or meta.get("date updated")
-            or meta.get("date created") or V.today())
+    return meta.get("last_compiled") or meta.get("generated_at") or V.today()
 
 
 def add(store, path, page, ingested):

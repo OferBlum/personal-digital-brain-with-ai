@@ -58,7 +58,7 @@ HEADER_MAP = {
 }
 
 PRIVACY_NOTE = (
-    "> Privacy: never touch `3 - Journal` or any file with `private: true`. "
+    "> Privacy: never read or list the private folder (folder-only rule; Docker does not mount it). "
     "The working directory must be the vault root.\n"
 )
 

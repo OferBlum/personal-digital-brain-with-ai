@@ -1,6 +1,6 @@
 # Digital Brain — An Agentic Obsidian Vault
 
-A personal knowledge base ("digital brain") that gets smarter every day, managed together by me and AI agents. One Obsidian vault, a lazy-loading skill system, an AI-maintained wiki (the **Karpathy method**), a semantic knowledge graph built with [graphify](https://github.com/sponsors/safishamsi), and hard privacy enforcement.
+A personal knowledge base ("digital brain") that gets smarter every day, managed together by me and AI agents. One Obsidian vault, a lazy-loading skill system, an AI-maintained wiki (the **Karpathy method**), a local cross-language semantic index, and hard privacy enforcement.
 
 > **The core principle: I write my ideas; the agents read and enrich.**
 
@@ -15,38 +15,45 @@ Every external source I want to keep (YouTube videos, articles, PDFs) gets compi
 Instead of loading all rules upfront (which wastes context and causes hallucinations), everything is split into separate skill files under `0 - System/SKILL-*.md`. `CLAUDE.md` is just a router: it reads the request and loads only the relevant skill. `skills-index.md` is the single source of truth for what exists. This keeps the agent sharp and the system easy to extend — adding a capability = adding one SKILL file and one router line.
 
 **3. My own ideas — written by me, wired in by the system.**
-The wiki holds the world's knowledge; `2 - Notes/` holds *mine*. I write ideas, thoughts, and summaries as plain notes (quick captures from Hermes land there too), and agents are forbidden from rewriting them — they only enrich and connect. The wiring happens on three levels without me doing anything: every note's `subject:` frontmatter attaches it to a topic hub in `1 - Topics/`; `autolink.py` scans bidirectionally after every compile, so a note that mentions a wiki page gets a `[[wikilink]]` and vice versa; and every graph refresh must add bridge edges between my note concepts and the wiki concepts on the same topic. New notes even count toward the graph-refresh threshold, exactly like external sources. The result: an idea I jot down today is automatically linked to everything I've ever learned about it — my thinking and the compiled knowledge become one connected brain, while staying clearly separated on disk (mine vs. compiled) so the agent always knows what it may touch.
+The wiki holds the world's knowledge; `2 - Notes/` holds *mine*. I write ideas, thoughts, and summaries as plain notes (quick captures from Hermes land there too), and agents are forbidden from rewriting them — they only enrich and connect. The wiring happens on three levels without me doing anything: every note's `subject:` frontmatter attaches it to a topic hub in `1 - Topics/`; `autolink.py` scans bidirectionally after every compile, so a note that mentions a wiki page gets a `[[wikilink]]` and vice versa; and the semantic index puts notes and wiki pages in one meaning space, so a question finds both. The result: an idea I jot down today is automatically linked to everything I've ever learned about it — my thinking and the compiled knowledge become one connected brain, while staying clearly separated on disk (mine vs. compiled) so the agent always knows what it may touch.
 
 ## Privacy — declared AND enforced
 
 The vault holds my whole life, including things no AI should ever see. The policy is
-**exactly two rules**, and both are enforced by code rather than by a prompt:
+**exactly one rule, and it is a folder**: `3 - Journal/` holds the journal and every other
+private file, and it is completely off-limits — no read, no write, no memory, no index. Not
+even a directory listing: the folder is never *mapped*, so its file names don't leak either.
 
-| Rule | Meaning | Enforced by |
-|------|---------|-------------|
-| **The journal** | `3 - Journal/` is completely off-limits — no read, write, memory, graph, or index | The pre-tool hook. Blocked wherever the folder name appears in a tool payload, for every tool |
-| **The private flag** | Any file with `private: true` in frontmatter is treated as non-existent | The same hook, for any call naming a single resolvable file (it reads that file's frontmatter); plus `vaultlib.py`, `gen_graphifyignore.py` and `embed_index.py --audit` for the bulk paths a hook can't see |
+| Layer | How the folder is kept out |
+|-------|----------------------------|
+| Agent tool calls | The pre-tool hook blocks any call whose payload contains the folder name, for every tool |
+| Search tools | A vault-root `.ignore` keeps ripgrep-based Grep/Glob out of it |
+| Scripts | `privacy_guard.iter_vault_files()` prunes the folder *before* descending, instead of `rglob` + filter |
+| Semantic index | `safe_input.py` reads only a positive allowlist of content folders; the private folder is unreachable |
+| Ambient agent | Hermes' Docker sandbox doesn't mount the folder at all |
+
+**Why a folder and not a flag.** An earlier version also honoured `private: true` in
+frontmatter. It couldn't be enforced honestly: a Bash or Grep call names no single file, so a
+hook can't check a flag it would have to open the file to read — and opening the file is the
+leak. A folder name *can* be checked in any payload, without opening anything. So the flag was
+retired; it grants nothing now, and anything private moves into the folder.
 
 **One guard, every agent.** The policy lives in exactly one file —
 `0 - System/scripts/privacy_guard.py` — and each runtime's hook is a thin wrapper around it
-(`.claude/privacy-guard.py`, `~/.hermes/agent-hooks/privacy-guard.py`; a Codex-backed agent
-reaches the vault through Hermes and inherits the same hook). This is the part worth copying:
-when each runtime shipped its own guard they silently drifted, and a vault is only as private
-as its weakest agent. `privacy_guard.py --selftest` runs the whole policy matrix against a
-throwaway fixture vault so the guarantee stays testable.
-
-**What it does not cover, stated plainly:** a Bash or Grep invocation names no single file, so
-the `private: true` rule cannot be evaluated for those calls. They are covered by the journal
-rule plus the script-level filters. Better to write that down than to imply a guarantee the
-code doesn't make.
+(`.claude/privacy-guard.py` fails closed; `~/.hermes/agent-hooks/privacy-guard.py` fails open so
+an ambient run never deadlocks; a Codex-backed agent reaches the vault through Hermes and
+inherits the same hook). This is the part worth copying: when each runtime shipped its own guard
+they silently drifted, and a vault is only as private as its weakest agent.
+`privacy_guard.py --selftest` runs the whole policy matrix against a throwaway fixture vault so
+the guarantee stays testable.
 
 **`_` files are not secret.** A leading underscore marks a *generated* file — skipped when
 indexing or compiling, but readable. (An earlier version of this system did treat `_` as a
 privacy rule; it contradicted "read `_cache.md` at session start" and broke the ambient agent.)
 
 Two more habits on top:
-- Both derived indexes (`graphify-out/`, `vector-out/`) are gitignored, because each one records
-  real note paths — the index files would themselves be a list of private note titles.
+- The derived index (`vector-out/`) is gitignored, because it records real note paths — the
+  index files would themselves be a list of private note titles.
 - The `wiki-librarian` sub-agent is forbidden from vault-wide searches, so a stray `grep` can't
   surface journal content.
 
@@ -78,9 +85,9 @@ Each folder has a clear owner and routing rule (full map in `0 - System/vault-ma
 - **`7 - Wikipedia/`** — the only folder the agent *writes* in. `raw/` inside it is the immutable inbox: transcripts and articles land there and are compiled into pages next to it.
 
 Frontmatter convention on every file: `type:`, `subject:`, `tags:`, `background:` (a one-line
-description), `private:`, `created:`, plus the OKF trust keys below. Agents may never invent new
-subjects, tags or types — `SCHEMA.md` is the controlled vocabulary, and `subject_candidates.py`
-*suggests* promotions that only I approve.
+description), plus the OKF trust keys below — which also carry the creation date, so there is no
+separate date key. Agents may never invent new subjects, tags or types — `SCHEMA.md` is the
+controlled vocabulary, and `subject_candidates.py` *suggests* promotions that only I approve.
 
 ## The OKF standard (v0.2)
 
@@ -118,43 +125,47 @@ capture (Hermes/Obsidian) ──► 2 - Notes ─┐
 drop source / URL / video ─► raw/ ─ingest─► 7 - Wikipedia ─┘
                                           │
                                           ├─► index.md / .manifest.json / log.md   (wiki bookkeeping)
-                                          ├─► graphify graph + bridge edges        (semantic layer)
+                                          ├─► vector-out/ semantic index           (meaning layer)
                                           └─► _cache.md                            (session memory)
 ```
 
 - **File layer:** `autolink.py` scans notes and wiki pages *bidirectionally* — an unlinked mention of any page title becomes a `[[wikilink]]`. On a name collision the wiki page wins and the note gets renamed. Runs after every compile and at every session start.
 - **Frontmatter layer:** every file's `subject:` ties it to a topic hub, so Dataview tables and topic pages aggregate automatically.
-- **Graph layer:** [graphify](https://github.com/sponsors/safishamsi) builds a semantic knowledge graph of the whole vault (minus private surfaces) into `graphify-out/`. Every refresh must add **bridge edges** between note concepts and wiki concepts on the same topic — the two corpora stay one brain. `check_graph_staleness.py` counts new sources and triggers a refresh offer at 5.
-- **Session layer:** `hooks.json` closes the loop automatically — at session start the agent reads `_cache.md`, checks for pending sources and unlinked mentions, and offers to act; at session end it updates the cache and `trim_cache.py` archives old sessions.
+- **Meaning layer:** the semantic index spans notes, topics and the wiki in one space, so a question about an idea finds my note and the compiled knowledge about it together, whatever language each was written in.
+- **Session layer:** `hooks.json` closes the loop automatically — at session start the agent reads `0 - System/_cache.md`, checks for pending sources, unlinked mentions and a stale index, and offers to act; at session end it updates the cache and `trim_cache.py` archives old sessions.
 
-## Two retrieval indexes
+## The semantic index
 
-The graph was never enough on its own. Every other kind of search here is *lexical* — `grep`,
-exact title matching, trigrams over graph labels — and none of those knows that a word and its
-translation are the same concept. In a vault that mixes languages mid-sentence, that is the case
-that falls through constantly. So there are two indexes, answering different questions:
+Every other kind of search here is *lexical* — `grep`, exact title matching — and none of those
+knows that a word and its translation are the same concept. In a vault that mixes languages
+mid-sentence, that is the case that falls through constantly. So retrieval goes through one
+semantic index:
 
 | Index | Answers | How |
 |-------|---------|-----|
-| `graphify-out/` | **how things connect** | concepts and edges, community detection |
 | `vector-out/` | **what things mean** | bge-m3 embeddings via local Ollama, cosine over numpy |
 
-`vsearch.py "question"` returns the most relevant passages by meaning, crossing languages and
+`vsearch.py "question"` returns the most relevant notes and pages by meaning, crossing languages and
 reaching `2 - Notes/` and `1 - Topics/` — which the old keyword path never touched. It is also
-step 2 of `SKILL-query`, so every question starts there.
+step 2 of `SKILL-query`, so every question starts there. It returns **paths only**; the agent then
+reads the one to three files above the score cliff.
 
 Deliberately not a vector database: at this size numpy does cosine over everything in under 10ms,
 so faiss/chroma would be dependencies bought for nothing. The index is derived and disposable —
 delete `vector-out/` and rebuild. `reindex.sh` is incremental: it prints which files were added,
 changed or deleted, then embeds only those, and `embed_index.py --check` nudges at session start
-when the index falls behind.
+when the index falls behind. Each build is written to a fresh generation folder and switched in
+by an atomic pointer, so a failed build never publishes partial or stale chunks.
 
-Privacy here is structural, not a filter: the indexer's allowlist contains three content folders,
-so the journal isn't excluded — it is never reachable. `embed_index.py --audit` re-proves that
-after every build and exits non-zero if anything slipped in. And `vector-out/` is gitignored,
-because its metadata records every indexed path.
+Privacy here is structural, not a filter: `safe_input.py` defines the input as a positive
+allowlist of three content folders, so the private folder isn't excluded — it is never reachable,
+never even listed. Symlinks are refused, since one could point anywhere. `embed_index.py --audit`
+re-proves the boundary after every build and exits non-zero if anything slipped in,
+`test_safe_index.py` spies on every `open`/`scandir` to prove it in tests, and `vector-out/` is
+gitignored, because its metadata records every indexed path.
 
-Graph refresh policy: extraction and community naming are done **by Claude Code on the Pro subscription** — never the raw API, and never a weak local model for extraction. `merge_nodes.py` merges Claude-authored nodes into the graph; `graphify cluster-only` (free, no LLM) re-clusters; `refresh_graph.sh` exists only as an Ollama fallback.
+*There used to be a second index — a graphify knowledge graph. It was removed: the semantic index
+plus `autolink.py` covered what it was used for, at a fraction of the upkeep.*
 
 ## How I Use Claude Code and Hermes
 
@@ -166,16 +177,15 @@ Run `claude` at the vault root. `CLAUDE.md` routes the request and lazy-loads ex
 - *"Compile this URL / the video queue"* → `SKILL-ingest` — fetches (Playwright or `youtube-fetch.py`), extracts concepts, writes the page, then runs the bookkeeping scripts (`build_manifest.py`, `build_index.py`, `append_log.py`, `validate.py`) and the crosslink/resolve follow-ups.
 - *"What do I know about X?"* → `SKILL-query` — semantic search first, then answers with citations and a confidence level (verified vs merely compiled).
 - *"Where did I write about…"* → `SKILL-vsearch` — meaning-based search across the whole vault.
-- *"Run graphify"* → graph refresh, with Claude itself doing the semantic extraction.
 - Session lifecycle is automated via `hooks.json`, and wiki work is delegated to the `wiki-librarian` sub-agent (`.claude/agents/wiki-librarian.md`) — a Sonnet agent that owns the pipeline and can only write inside `7 - Wikipedia/`.
 
-Used for: compiling, analysis, cross-linking, graph extraction, health checks. Quality-critical work on the Pro subscription.
+Used for: compiling, analysis, cross-linking, health checks. Quality-critical work on the Pro subscription.
 
 ### Hermes — the ambient agent
 `hermes chat` in the terminal. Model switching is one alias per provider in `~/.hermes/config.yaml` — e.g. `/model gpt` (cloud) or `/model local` (on-device Ollama for anything private). Claude never runs inside Hermes (subscription ToS); the Anthropic key lives outside `~/.hermes` entirely.
 
 - **Quick capture:** "jot this down" → a note in `2 - Notes` (never the journal, never directly the wiki).
-- **Quick answers:** `/graphify query "..."` hits the knowledge graph instantly and free.
+- **Quick answers:** `vsearch.py` returns the relevant notes and pages by meaning, instantly and on-device.
 - **Same skills, zero copies:** `0 - System/hermes-skills/` (generated from the vault's SKILL files by `sync_skills_to_hermes.py --apply`) is registered as `skills.external_dirs` in Hermes' config — Hermes loads the vault's skills *live*, nothing is copied into `~/.hermes`. A skill can be marked `skip` so it is never exported: publishing is, because it does git operations and a leak audit.
 
 Rule of thumb: **Hermes for anything under a minute, Claude Code for anything that changes the vault.** Obsidian itself stays the writing surface for my own thinking.
@@ -209,8 +219,11 @@ All in `0 - System/scripts/` (plus `youtube-fetch.py` and `list_tags.sh` in `0 -
 | `okf_migrate.py` / `okf_verify.py` | migrate frontmatter to OKF v0.2; stamp and audit the `verified` trust layer |
 | `embed_index.py` / `vsearch.py` / `reindex.sh` | build, query and incrementally update the semantic index |
 | `subject_candidates.py` | suggest concepts worth promoting to a SCHEMA subject |
-| `gen_graphifyignore.py` | generate the privacy-safe graph ignore file |
-| `check_graph_staleness.py` / `merge_nodes.py` / `refresh_graph.sh` | graph refresh pipeline |
+| `safe_input.py` | the semantic index's input boundary: a positive folder allowlist, checked before any file is opened |
+| `test_safe_index.py` | privacy regression tests for the index, run against a throwaway fixture vault |
+| `vault-python.sh` | run the search scripts in an isolated, pinned Python environment (host or Docker) |
+| `gen_graphifyignore.py` | generate a static, privacy-safe ignore file for graph-style indexers |
+| `merge_nodes.py` | merge agent-authored nodes into a graphify graph (kept for anyone who still runs one) |
 | `sync_skills_to_hermes.py` | regenerate `hermes-skills/` (agentskills.io format) from the SKILL files |
 | `publish_check.py` / `publish_port.py` | detect drift against the public mirror and port the mechanical parts; leak audit |
 | `trim_cache.py` | session-cache rotation |
@@ -224,11 +237,14 @@ All in `0 - System/scripts/` (plus `youtube-fetch.py` and `list_tags.sh` in `0 -
 3. Run `claude` at the vault root — the privacy guard and session hooks are wired via `.claude/`.
    Sanity-check the guard first: `python3 "0 - System/scripts/privacy_guard.py" --selftest`.
 4. Build the semantic index once: `bash "0 - System/scripts/reindex.sh"`.
+   Run the privacy regression tests too: `python3 -m unittest discover -s "0 - System/scripts" -p "test_*.py"`.
 5. Drop a source into `7 - Wikipedia/raw/` (or add a YouTube URL to `raw/youtube_queue.md`) and say *"compile the new sources"*.
-6. Optional: install [graphify](https://github.com/sponsors/safishamsi) for the knowledge graph, and [Hermes](https://github.com/NousResearch/hermes-agent) for the ambient agent.
-
-Requirements: Python 3.8+, `pip install pyyaml numpy`, and [Ollama](https://ollama.com) with
-`ollama pull bge-m3` for semantic search (everything embedding-related runs on-device).
+6. Optional: install [Hermes](https://github.com/NousResearch/hermes-agent) for the ambient agent.
+Requirements: Python 3.8+ and [Ollama](https://ollama.com) with `ollama pull bge-m3` for semantic
+search (everything embedding-related runs on-device). The search scripts run through
+`vault-python.sh`, which builds an isolated venv from `vault-search-requirements.txt` (pinned
+numpy + PyYAML) on first use; the other scripts need `pip install pyyaml`.
+`pip install youtube-transcript-api` for the YouTube pipeline.
 `pip install youtube-transcript-api` for the YouTube pipeline.
 
 Already have a vault with frontmatter? `python3 "0 - System/scripts/okf_migrate.py"` shows what

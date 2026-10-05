@@ -155,7 +155,7 @@ def main():
 
     scope = f"{counts.get('wiki',0)} wiki · {counts.get('note',0)} notes · {counts.get('topic',0)} topics"
     lines = ["---", "type: report", "subject:", "tags:", "  - report",
-             "private: false", "---", "# Validation report", "",
+             "---", "# Validation report", "",
              f"Generated: {V.today()} · {scope} · 🔴 errors: {len(errors)} · 🟡 warnings: {len(warns)}", ""]
     if errors:
         lines += ["## 🔴 Errors", ""] + [f"- **{n}** — {m}" for n, m in errors] + [""]

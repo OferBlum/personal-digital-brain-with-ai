@@ -19,11 +19,16 @@ NOTES = VAULT / "2 - Notes"
 TOPICS = VAULT / "1 - Topics"
 SYS   = VAULT / "0 - System"
 
-JOURNAL = "3 - Journal"        # never touched, ever
+# The one privacy rule is folder-only, and it is defined in one place: privacy_guard.py.
+# PRIVATE_DIR = the private folder (journal + every private file) — never touched, never mapped.
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from privacy_guard import PRIVATE_DIR, is_blocked, iter_vault_files  # noqa: E402
+JOURNAL = PRIVATE_DIR  # alias kept for backward compatibility
 
 # `_` files are generated system files (not content, not secrets) — we neither
-# index nor compile them. This is *not* a privacy rule: the privacy rules are
-# the journal and `private: true`, and nothing else.
+# index nor compile them. This is *not* a privacy rule: the only privacy rule is
+# the private folder.
 SYSTEM_PREFIX = "_"
 
 PREFERRED_KEYS = ["type", "subject", "tags", "background", "private", "status",
@@ -36,8 +41,8 @@ def nfc(s):
 
 
 def is_forbidden(path):
-    """The absolute privacy rule: the journal."""
-    return JOURNAL in nfc(str(path))
+    """The one privacy rule: the private folder."""
+    return is_blocked(path)
 
 
 def today():
@@ -234,8 +239,8 @@ def render_page(meta, body):
 NON_CONTENT = {"index.md", "log.md", "WIKI-GUIDE.md"}
 
 
-def iter_wiki_pages(include_private=False):
-    """Content pages in 7 - Wikipedia/ only (no raw/, no system files, no _ , no private)."""
+def iter_wiki_pages():
+    """Content pages in 7 - Wikipedia/ only (no raw/, no system files, no _)."""
     for p in sorted(WIKI.glob("*.md")):
         name = nfc(p.name)
         if name in NON_CONTENT:
@@ -245,8 +250,6 @@ def iter_wiki_pages(include_private=False):
         if is_forbidden(p):
             continue
         meta, body = read_page(p)
-        if not include_private and str(meta.get("private", "")).lower() == "true":
-            continue
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
@@ -255,20 +258,18 @@ def iter_wiki_pages(include_private=False):
         yield p, meta, body
 
 
-def iter_notes(include_private=False):
-    """Notes in 2 - Notes/ (no _ , no private) — the same filters as iter_wiki_pages."""
+def iter_notes():
+    """Notes in 2 - Notes/ (no _) — the same filters as iter_wiki_pages."""
     for p in sorted(NOTES.glob("*.md")):
         if nfc(p.name).startswith(SYSTEM_PREFIX):
             continue
         if is_forbidden(p):
             continue
         meta, body = read_page(p)
-        if not include_private and str(meta.get("private", "")).lower() == "true":
-            continue
         yield p, meta, body
 
 
-def iter_topics(include_private=False):
+def iter_topics():
     """Topic pages in 1 - Topics/ — the same filters as iter_notes."""
     for p in sorted(TOPICS.glob("*.md")):
         if nfc(p.name).startswith(SYSTEM_PREFIX):
@@ -276,18 +277,14 @@ def iter_topics(include_private=False):
         if is_forbidden(p):
             continue
         meta, body = read_page(p)
-        if not include_private and str(meta.get("private", "")).lower() == "true":
-            continue
         yield p, meta, body
 
 
 def all_md_index():
-    """Map nfc(stem) -> [paths] for the whole vault except the journal.
+    """Map nfc(stem) -> [paths] for the whole vault except the private folder.
     Resolves wikilinks without depending on filesystem unicode normalization."""
     idx = {}
-    for p in VAULT.rglob("*.md"):
-        if is_forbidden(p):
-            continue
+    for p in iter_vault_files(VAULT):          # not rglob: the private folder is never scanned at all
         # Backups are not real files — without this filter every backup makes
         # every link ambiguous.
         if ".backup" in p.parts or "graphify-out" in p.parts:

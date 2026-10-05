@@ -5,12 +5,19 @@
 # The index itself is derived from the markdown and can be deleted and rebuilt at any time.
 set -euo pipefail
 
-# Vault root = two levels above this script, so the file works wherever the vault lives.
-VAULT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-INDEXER="$VAULT/0 - System/scripts/embed_index.py"
+# Vault root = VAULT_ROOT, or two levels above this script, so the file works wherever the vault lives.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VAULT="${VAULT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+INDEXER="$SCRIPT_DIR/embed_index.py"
+PYTHON="$SCRIPT_DIR/vault-python.sh"
+if [ -f /.dockerenv ]; then
+  export OLLAMA_HOST="${OLLAMA_HOST:-http://host.docker.internal:11434}"
+fi
 OLLAMA="${OLLAMA_HOST:-http://localhost:11434}"
 
 cd "$VAULT"
+
+# The indexing boundary is folder-only (safe_input.py) — the private folder is never read nor mapped.
 
 # embed_index.py only discovers that Ollama is down inside embed(), after it has already
 # read and chunked every file. Better to fail here, in the first second, with a message
@@ -25,10 +32,10 @@ require_ollama() {
 if [ $# -gt 0 ]; then
   # --status and --audit generate no embeddings; only --rebuild needs Ollama.
   case " $* " in *" --rebuild "*) require_ollama ;; esac
-  exec python3 "$INDEXER" "$@"
+  exec bash "$PYTHON" "$INDEXER" "$@"
 fi
 
-changes="$(python3 "$INDEXER" --changes)"
+changes="$(bash "$PYTHON" "$INDEXER" --changes)"
 if [ -z "$changes" ]; then
   echo "✅ The semantic index is up to date — nothing to do."
   exit 0
@@ -41,4 +48,4 @@ echo "🔎 $new new · $mod changed · $del deleted"
 printf '%s\n\n' "$changes"
 
 require_ollama
-exec python3 "$INDEXER"
+exec bash "$PYTHON" "$INDEXER"
