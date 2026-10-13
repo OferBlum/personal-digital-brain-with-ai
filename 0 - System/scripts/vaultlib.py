@@ -19,16 +19,17 @@ NOTES = VAULT / "2 - Notes"
 TOPICS = VAULT / "1 - Topics"
 SYS   = VAULT / "0 - System"
 
-# The one privacy rule is folder-only, and it is defined in one place: privacy_guard.py.
+# Shared privacy: the protected folder and symlinks only; frontmatter is never a privacy signal.
 # PRIVATE_DIR = the private folder (journal + every private file) — never touched, never mapped.
 import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
-from privacy_guard import PRIVATE_DIR, is_blocked, iter_vault_files  # noqa: E402
+from privacy_guard import (PRIVATE_DIR, is_blocked, iter_vault_files,
+                           read_public_page, PrivacyDenied, HEADER_FENCE)  # noqa: E402
 JOURNAL = PRIVATE_DIR  # alias kept for backward compatibility
 
 # `_` files are generated system files (not content, not secrets) — we neither
-# index nor compile them. This is *not* a privacy rule: the only privacy rule is
-# the private folder.
+# index nor compile them. This is *not* a privacy rule; the protected folder is
+# enforced separately.
 SYSTEM_PREFIX = "_"
 
 PREFERRED_KEYS = ["type", "subject", "tags", "background", "private", "status",
@@ -41,7 +42,7 @@ def nfc(s):
 
 
 def is_forbidden(path):
-    """The one privacy rule: the private folder."""
+    """Exclude the protected folder and symlinks; frontmatter never excludes."""
     return is_blocked(path)
 
 
@@ -221,13 +222,20 @@ def dump_fm(meta):
 
 
 def read_page(path):
-    text = Path(path).read_text(encoding="utf-8")
-    fm_lines, body = split_frontmatter(text)
-    meta = parse_fm(fm_lines) if fm_lines is not None else {}
-    return meta, body
+    """Excluded files are nonexistent; a malformed header reads as {} and stays in the body."""
+    meta, body = read_public_page(path)
+    return {k: _none_to_empty(v) for k, v in meta.items()}, body
+
+
+def has_broken_header(meta, body):
+    """True for a page whose malformed header was kept, unparsed, at the top of the body."""
+    return not meta and HEADER_FENCE.match(body) is not None
 
 
 def render_page(meta, body):
+    # New metadata above a malformed header would create two headers — fix it by hand first.
+    if meta and HEADER_FENCE.match(body):
+        raise ValueError("Malformed frontmatter must be fixed by hand before adding fields.")
     return dump_fm(meta) + "\n" + body if meta else body
 
 
@@ -239,13 +247,21 @@ def render_page(meta, body):
 NON_CONTENT = {"index.md", "log.md", "WIKI-GUIDE.md"}
 
 
+def _top_level_pages(root):
+    if is_forbidden(root) or not root.is_dir():
+        return
+    for path in sorted(root.glob('*.md')):
+        if not nfc(path.name).startswith(SYSTEM_PREFIX) and not is_forbidden(path):
+            yield path
+
+
 def iter_wiki_pages():
     """Content pages in 7 - Wikipedia/ only (no raw/, no system files, no _)."""
-    for p in sorted(WIKI.glob("*.md")):
+    for p in _top_level_pages(WIKI):
         name = nfc(p.name)
         if name in NON_CONTENT:
             continue
-        if name.startswith(SYSTEM_PREFIX):   # system files (_cache etc.) are not content pages
+        if name.startswith("_"):          # system files (_cache etc.) are not content pages
             continue
         if is_forbidden(p):
             continue
@@ -253,15 +269,15 @@ def iter_wiki_pages():
         tags = meta.get("tags", [])
         if isinstance(tags, str):
             tags = [tags]
-        if "report" in tags:                 # auto-generated report files
+        if "report" in tags:              # auto-generated report files
             continue
         yield p, meta, body
 
 
 def iter_notes():
     """Notes in 2 - Notes/ (no _) — the same filters as iter_wiki_pages."""
-    for p in sorted(NOTES.glob("*.md")):
-        if nfc(p.name).startswith(SYSTEM_PREFIX):
+    for p in _top_level_pages(NOTES):
+        if nfc(p.name).startswith("_"):
             continue
         if is_forbidden(p):
             continue
@@ -271,7 +287,7 @@ def iter_notes():
 
 def iter_topics():
     """Topic pages in 1 - Topics/ — the same filters as iter_notes."""
-    for p in sorted(TOPICS.glob("*.md")):
+    for p in _top_level_pages(TOPICS):
         if nfc(p.name).startswith(SYSTEM_PREFIX):
             continue
         if is_forbidden(p):
@@ -281,15 +297,11 @@ def iter_topics():
 
 
 def all_md_index():
-    """Map nfc(stem) -> [paths] for the whole vault except the private folder.
-    Resolves wikilinks without depending on filesystem unicode normalization."""
+    """Index public stems under explicit allowed roots, never the vault root."""
     idx = {}
-    for p in iter_vault_files(VAULT):          # not rglob: the private folder is never scanned at all
-        # Backups are not real files — without this filter every backup makes
-        # every link ambiguous.
-        if ".backup" in p.parts or "graphify-out" in p.parts:
-            continue
-        idx.setdefault(nfc(p.stem), []).append(p)
+    for root in (WIKI, NOTES, TOPICS, SYS):
+        for p in iter_vault_files(root, prune=('.backup', 'graphify-out')):
+            idx.setdefault(nfc(p.stem), []).append(p)
     return idx
 
 
@@ -301,12 +313,25 @@ def resolve_link(inner, md_index=None):
     """
     inner = nfc(inner.split("|")[0].strip())
     cand = inner[:-3] if inner.endswith(".md") else inner
-    if "/" in cand:                       # full path
-        p = VAULT / (cand + ".md")
-        return ("ok", p) if p.exists() else ("missing", None)
-    # Name only → search the vault
-    md_index = md_index or all_md_index()
-    matches = md_index.get(nfc(cand), [])
+    def visible(path):
+        p = Path(path)
+        try:
+            relative = p.relative_to(VAULT)
+        except ValueError:
+            return False
+        if not relative.parts or relative.parts[0] not in {WIKI.name, NOTES.name, TOPICS.name, SYS.name}:
+            return False
+        if '..' in relative.parts or is_forbidden(p):
+            return False
+        return p.is_file()
+
+    if '/' in cand or '\\' in cand:
+        if '\\' in cand or Path(cand).is_absolute() or '..' in Path(cand).parts:
+            return ('missing', None)
+        p = VAULT / (cand + '.md')
+        return ('ok', p) if visible(p) else ('missing', None)
+    md_index = all_md_index() if md_index is None else md_index
+    matches = [p for p in md_index.get(nfc(cand), []) if visible(p)]
     if len(matches) == 1:
         return ("ok", matches[0])
     if len(matches) == 0:
@@ -322,13 +347,29 @@ def rel(path):
 
 def backup(paths, label):
     """Copies the files to 7 - Wikipedia/.backup/<timestamp-label>/ before modifying them."""
+    paths = [Path(p) for p in paths]
+    if not re.fullmatch(r'[\w-]+', label):
+        raise PrivacyDenied()
+    # Reject the whole batch before creating output or copying any body.
+    for p in paths:
+        try:
+            relative = p.relative_to(VAULT)
+        except ValueError:
+            raise PrivacyDenied() from None
+        if '..' in relative.parts or is_forbidden(p):
+            raise PrivacyDenied()
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     dest = WIKI / ".backup" / f"{stamp}-{label}"
+    if is_forbidden(dest):
+        raise PrivacyDenied()
     for p in paths:
-        p = Path(p)
         if not p.exists():
             continue
         target = dest / p.relative_to(VAULT)
+        if is_forbidden(p) or is_forbidden(target):
+            raise PrivacyDenied()
         target.parent.mkdir(parents=True, exist_ok=True)
+        if is_forbidden(p) or is_forbidden(target):
+            raise PrivacyDenied()
         shutil.copy2(p, target)
     return dest

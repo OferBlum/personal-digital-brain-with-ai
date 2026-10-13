@@ -17,7 +17,7 @@ scripts read it. This skill is only the procedure around them.
    can't leak by accident.
 2. **Never commit and never push.** Finish at `git add` and report. The owner pushes.
 3. **No Hebrew in the mirror.** Zero Hebrew characters in the public repo. Regex ranges are written as
-   `\uXXXX` (see `autolink.py`, `merge_nodes.py`) or built from bytes (`list_tags.sh`).
+   `\uXXXX` escapes or built from bytes (see `list_tags.sh`).
 4. **`placeholders:` and `sanitized:` are never overwritten.** They were written by hand on purpose.
 5. **The audit is the gate.** If `publish_check.py` doesn't return CLEAN — don't stage.
 

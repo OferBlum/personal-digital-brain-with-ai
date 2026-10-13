@@ -12,19 +12,14 @@ generated_at: 2026-07-08
 
 # skills-index.md — The Skill Catalog
 
-> A Layer 2 core file of [[AIOS]]. Single source of truth for the skill list. The skills themselves in `0 - System/SKILL-*.md` are **lazy-loaded** — only when the request matches (see [[AGENTS]]). When a skill is ported to Hermes, that's the format (SKILL.md) and the source stays here.
+> A Layer 2 core file of [[AIOS]]. Single source of truth for the skill list. The skills themselves (`0 - System/SKILL-*.md`, plus the standalone `wiki-librarian` skill in `0 - System/hermes-skills/knowledge/`) are **lazy-loaded** — only when the request matches (see [[AGENTS]]). When a skill is ported to Hermes, that's the format (SKILL.md) and the source stays here.
 
 ## Knowledge & wiki maintenance
 
 | Skill | When to trigger | Role |
 |-------|-----------------|------|
-| `SKILL-ingest` | "compile…" / a new source (URL, YouTube, raw) | Compile an external source into a wiki page + update manifest/index/log |
-| `SKILL-resolve` | after every ingest | Update existing pages for contradictions/reinforcements/additions; updates last_compiled |
-| `SKILL-crosslink` | after every ingest | Automatic [[wikilinks]] (dry-run → apply) |
-| `SKILL-query` | a general question about the vault | Semantic search first, then answer with citations + a confidence level |
+| `wiki-librarian` | "compile…", "what do I know about…", "check the wiki", "organize these files" | One skill for the source-summary wiki and scoped file work; routes each task to one file in its `references/` (ingest, resolve, crosslink, query, audit, files) |
 | `SKILL-vsearch` | "where did I write about…" / half-remembered phrasing | Meaning-based search across the whole vault; crosses languages; reaches notes and topics |
-| `SKILL-lint` | "health check" | Validation: frontmatter, broken links, stale pages, missing sources |
-| `SKILL-status` | "what's the wiki status?" / "what's pending?" | Health check: manifest, sources, compile state |
 
 ## Maintenance
 
@@ -37,7 +32,7 @@ generated_at: 2026-07-08
 Domain skills (investing, nutrition, styling, journal summarization) are **deliberately not in
 this repo**. They are personal by nature, and each lives as its own standalone repo — see
 *Companion Repos* in the README. The pattern is what transfers, not the content: one
-`SKILL-*.md` file, one row in this table, one route in `AGENTS.md`.
+`SKILL-*.md` file and one row in this table — `AGENTS.md` points every agent here.
 
 ## Notes
 

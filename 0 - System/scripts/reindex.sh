@@ -17,7 +17,7 @@ OLLAMA="${OLLAMA_HOST:-http://localhost:11434}"
 
 cd "$VAULT"
 
-# The indexing boundary is folder-only (safe_input.py) — the private folder is never read nor mapped.
+# Folder allowlist boundary (safe_input.py); a malformed header reads as empty. No excluded filenames in output.
 
 # embed_index.py only discovers that Ollama is down inside embed(), after it has already
 # read and chunked every file. Better to fail here, in the first second, with a message
@@ -41,10 +41,7 @@ if [ -z "$changes" ]; then
   exit 0
 fi
 
-new=$(printf '%s\n' "$changes" | grep -c '^+ ' || true)
-mod=$(printf '%s\n' "$changes" | grep -c '^~ ' || true)
-del=$(printf '%s\n' "$changes" | grep -c '^- ' || true)
-echo "🔎 $new new · $mod changed · $del deleted"
+# --changes emits counts only: removed/excluded filenames must never be displayed.
 printf '%s\n\n' "$changes"
 
 require_ollama

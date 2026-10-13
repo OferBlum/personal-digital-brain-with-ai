@@ -13,6 +13,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
+
+def require_public_target(path):
+    """Reject unavailable targets before body reads, backups or replacement."""
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents) or V.is_forbidden(path):
+        raise SystemExit("Unavailable bookkeeping target; operation refused.")
+
 REPORT = V.WIKI / "validation_report.md"
 SCHEMA = V.SYS / "SCHEMA.md"
 HOOK = "--hook" in sys.argv
@@ -32,6 +38,7 @@ def _section(text, header):
 
 def read_schema():
     """Returns (subjects, types, tags) — or Nones if there is no SCHEMA."""
+    require_public_target(SCHEMA)
     if not SCHEMA.exists():
         return None, None, None
     text = SCHEMA.read_text(encoding="utf-8")
@@ -132,12 +139,20 @@ def check(p, meta, kind, subjects, types, tags_allowed, md_index, errors, warns)
         short = V.nfc(inner.split("/")[-1])
         if subjects is not None and (V.nfc(inner) in subjects or short in subjects):
             continue
-        status, _ = V.resolve_link(inner, md_index)
-        if status == "missing":
-            warns.append((name, f"broken link: {inner}"))
+        if inner.startswith(("http://", "https://")) or Path(inner).suffix.lower() not in ("", ".md"):
+            warns.append((name, "External URL or non-Markdown source: not validated."))
+            continue
+        status, target = V.resolve_link(inner, md_index)
+        # Missing may mean excluded; reporting the raw reference would disclose
+        # a private filename. Unknown resolver statuses also fail closed.
+        if status != "ok" or target is None:
+            warns.append((name, "link not available for checking in the public index (missing/ambiguous/out of scope)."))
+        elif Path(target).is_symlink() or V.is_forbidden(Path(target)):
+            warns.append((name, "link not available for checking in the public index."))
 
 
 def main():
+    require_public_target(REPORT)
     subjects, types, tags_allowed = read_schema()
     md_index = V.all_md_index()
     errors, warns = [], []
@@ -163,6 +178,7 @@ def main():
         lines += ["## 🟡 Warnings", ""] + [f"- **{n}** — {m}" for n, m in warns] + [""]
     if not errors and not warns:
         lines.append("✅ All clean.")
+    require_public_target(REPORT)
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"🔴 errors: {len(errors)} · 🟡 warnings: {len(warns)} · {scope} · 📄 {V.rel(REPORT)}")

@@ -1,34 +1,58 @@
-"""Input boundary for the semantic index: folder-only.
+"""Folder boundary for the semantic index.
 
-Privacy in this vault is a folder rule and nothing else (privacy_guard.py): the private
-folder is never read and never listed. Everything the indexer may read is defined
-POSITIVELY, before any file is opened, by FOLDERS below — top-level .md files in those
-folders, minus `_` system files. No frontmatter flag, approval manifest or snapshot is
-consulted; nothing outside FOLDERS is ever opened or listed.
-
-FOLDERS is a scope choice (what counts as knowledge), not a privacy rule — the privacy
-rule is enforced independently by is_blocked() on every path, including symlink targets.
+Only top-level markdown under FOLDERS is considered (so `raw/` and `.backup/`
+stay out). Privacy comes from the folder boundary alone: the protected folder
+and symlinked paths are refused, and every read goes through the guard's
+NOFOLLOW reader. Frontmatter comes from the same parser the guard and vaultlib
+use (privacy_guard.split_header), so a file reads the same here as for agents.
+Neither vault-root nor protected-area scans are permitted. System-prefixed files
+are out of scope.
 """
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 import vaultlib as V
+import privacy_guard as G
 
-FOLDERS = ('7 - Wikipedia', '2 - Notes', '1 - Topics')
+FOLDERS = G.CONTENT_ROOT_NAMES
+
+
+def _relative_path(rel):
+    if not isinstance(rel, str) or not rel or '\\' in rel:
+        return None
+    p = PurePosixPath(rel)
+    if (p.is_absolute() or len(p.parts) != 2 or p.as_posix() != rel
+            or p.parts[0] not in FOLDERS or not rel.endswith('.md')
+            or p.name.startswith(V.SYSTEM_PREFIX)):
+        return None
+    return V.VAULT / rel
+
+
+def _outside(path):
+    """Protected folder or a symlink anywhere on the path."""
+    return G.folder_blocked(path) or G.has_symlink(path)
+
+
+def cache_permitted(rel):
+    """Folder-only cache preflight; deleted sources may be filtered by search.
+
+    A genuinely absent regular path is safe to retain until an update.
+    """
+    path = _relative_path(rel)
+    if path is None:
+        return False
+    try:
+        return not _outside(path) and (not path.exists() or path.is_file())
+    except OSError:
+        return False
 
 
 def permitted(rel):
-    """True if `rel` (vault-relative, posix) is inside the index boundary and still exists."""
-    if not isinstance(rel, str) or not rel or '\\' in rel:
+    """True only for an existing, non-symlinked source inside the boundary."""
+    path = _relative_path(rel)
+    if path is None:
         return False
-    p = PurePosixPath(rel)
-    if (p.is_absolute() or len(p.parts) != 2 or p.parts[0] not in FOLDERS
-            or not rel.endswith('.md') or p.name.startswith(V.SYSTEM_PREFIX)
-            or V.is_forbidden(rel)):
-        return False
-    path = V.VAULT / rel
     try:
-        # A symlink could point anywhere — including the private folder. Refuse them.
-        return path.is_file() and not path.is_symlink() and not V.is_forbidden(path.resolve())
+        return not _outside(path) and path.is_file()
     except OSError:
         return False
 
@@ -37,7 +61,7 @@ def sources():
     """(rel, path) for every file inside the boundary. Lists only the allowed folders."""
     for folder in FOLDERS:
         root = V.VAULT / folder
-        if not root.is_dir():
+        if _outside(root) or not root.is_dir():
             continue
         for path in sorted(root.glob('*.md')):
             rel = f'{folder}/{V.nfc(path.name)}'
@@ -46,13 +70,10 @@ def sources():
 
 
 def read(rel):
-    """(meta, body) for a permitted file, or None."""
+    """(meta, body) for a permitted file, or None. A broken header reads as {}."""
     if not permitted(rel):
         return None
     try:
-        content = (V.VAULT / rel).read_text(encoding='utf-8')
-    except (OSError, UnicodeDecodeError):
+        return V.read_page(V.VAULT / rel)
+    except OSError:
         return None
-    fm, body = V.split_frontmatter(content)
-    meta = V.parse_fm(fm) if fm is not None else {}
-    return meta, body

@@ -40,8 +40,8 @@ retired; it grants nothing now, and anything private moves into the folder.
 
 **One guard, every agent.** The policy lives in exactly one file —
 `0 - System/scripts/privacy_guard.py` — and each runtime's hook is a thin wrapper around it
-(`.claude/privacy-guard.py` fails closed; `~/.hermes/agent-hooks/privacy-guard.py` fails open so
-an ambient run never deadlocks; a Codex-backed agent reaches the vault through Hermes and
+(`.claude/privacy-guard.py` fails closed; `~/.hermes/agent-hooks/privacy-guard.py` fails closed too, but
+signals the block in JSON with exit 0 so an ambient run never deadlocks; a Codex-backed agent reaches the vault through Hermes and
 inherits the same hook). This is the part worth copying: when each runtime shipped its own guard
 they silently drifted, and a vault is only as private as its weakest agent.
 `privacy_guard.py --selftest` runs the whole policy matrix against a throwaway fixture vault so
@@ -61,7 +61,7 @@ Two more habits on top:
 
 ```text
 Vault_Root/
-├── AGENTS.md            # Canonical agent instructions — privacy rules + skill router (any agent)
+├── AGENTS.md            # Canonical agent rules — context, privacy boundaries, execution (any agent)
 ├── CLAUDE.md            # Thin Claude Code layer — imports AGENTS.md
 ├── SYSTEM-GUIDE.md      # The human-facing operating manual
 ├── 0 - System/          # The engine room (see below)
@@ -112,8 +112,7 @@ On top sits a **trust layer** that separates two things most systems conflate:
 - `status:` — `draft` / `stable` / `deprecated`. Absent = `stable`.
 
 Two flat keys, never a nested `generated:` map — Obsidian Properties only renders flat scalars,
-and a nested map swallows both rows. `okf_migrate.py` migrates an existing vault (dry-run by
-default), `validate.py` enforces the result.
+and a nested map swallows both rows. `validate.py` enforces the result.
 
 ## Everything Is Connected
 
@@ -121,7 +120,7 @@ The point of the system is that no piece of knowledge stays an island:
 
 ```
 capture (Hermes/Obsidian) ──► 2 - Notes ─┐
-                                          ├─► autolink.py ◄─► [[wikilinks]] both ways
+                                          ├─► librarian links ◄─► [[wikilinks]], chosen per page
 drop source / URL / video ─► raw/ ─ingest─► 7 - Wikipedia ─┘
                                           │
                                           ├─► index.md / .manifest.json / log.md   (wiki bookkeeping)
@@ -129,10 +128,10 @@ drop source / URL / video ─► raw/ ─ingest─► 7 - Wikipedia ─┘
                                           └─► _cache.md                            (session memory)
 ```
 
-- **File layer:** `autolink.py` scans notes and wiki pages *bidirectionally* — an unlinked mention of any page title becomes a `[[wikilink]]`. On a name collision the wiki page wins and the note gets renamed. Runs after every compile and at every session start.
+- **File layer:** links between notes and wiki pages are added by the librarian, on request: semantic search proposes candidates, the agent reads each one and adds only the links that help a reader. On a name collision it links by full path instead of picking a winner, and linking to a note never edits that note.
 - **Frontmatter layer:** every file's `subject:` ties it to a topic hub, so Dataview tables and topic pages aggregate automatically.
 - **Meaning layer:** the semantic index spans notes, topics and the wiki in one space, so a question about an idea finds my note and the compiled knowledge about it together, whatever language each was written in.
-- **Session layer:** `hooks.json` closes the loop automatically — at session start the agent reads `0 - System/_cache.md`, checks for pending sources, unlinked mentions and a stale index, and offers to act; at session end it updates the cache and `trim_cache.py` archives old sessions.
+- **Session layer:** `hooks.json` closes the loop automatically — at session start the agent reads `0 - System/_cache.md`, checks for pending sources and a stale index, and offers to act; at session end it updates the cache and `trim_cache.py` archives old sessions.
 
 ## The semantic index
 
@@ -147,7 +146,7 @@ semantic index:
 
 `vsearch.py "question"` returns the most relevant notes and pages by meaning, crossing languages and
 reaching `2 - Notes/` and `1 - Topics/` — which the old keyword path never touched. It is also
-step 2 of `SKILL-query`, so every question starts there. It returns **paths only**; the agent then
+the first step of the librarian's query procedure, so every question starts there. It returns **paths only**; the agent then
 reads the one to three files above the score cliff.
 
 Deliberately not a vector database: at this size numpy does cosine over everything in under 10ms,
@@ -165,7 +164,7 @@ re-proves the boundary after every build and exits non-zero if anything slipped 
 gitignored, because its metadata records every indexed path.
 
 *There used to be a second index — a graphify knowledge graph. It was removed: the semantic index
-plus `autolink.py` covered what it was used for, at a fraction of the upkeep.*
+plus librarian-chosen links covered what it was used for, at a fraction of the upkeep.*
 
 ## How I Use Claude Code and Hermes
 
@@ -174,10 +173,10 @@ Two agent runtimes share the same vault and the same skills — each with a job:
 ### Claude Code — the deep-work engine
 Run `claude` at the vault root. `CLAUDE.md` routes the request and lazy-loads exactly one skill:
 
-- *"Compile this URL / the video queue"* → `SKILL-ingest` — fetches (Playwright or `youtube-fetch.py`), extracts concepts, writes the page, then runs the bookkeeping scripts (`build_manifest.py`, `build_index.py`, `append_log.py`, `validate.py`) and the crosslink/resolve follow-ups.
-- *"What do I know about X?"* → `SKILL-query` — semantic search first, then answers with citations and a confidence level (verified vs merely compiled).
+- *"Compile this URL / the video queue"* → the `wiki-librarian` skill (`references/ingest.md`) — checks the source isn't already summarized, fetches the real content (Playwright or `youtube-fetch.py`), writes one summary per source, updates `index.md` / `.manifest.json` / `log.md`, and re-runs the read-only `audit.py`.
+- *"What do I know about X?"* → the librarian's query procedure — semantic search first, then answers with citations; read-only, nothing is written.
 - *"Where did I write about…"* → `SKILL-vsearch` — meaning-based search across the whole vault.
-- Session lifecycle is automated via `hooks.json`, and wiki work is delegated to the `wiki-librarian` sub-agent (`.claude/agents/wiki-librarian.md`) — a Sonnet agent that owns the pipeline and can only write inside `7 - Wikipedia/`.
+- Session lifecycle is automated via `hooks.json`, and wiki work can be delegated to the `wiki-librarian` sub-agent (`.claude/agents/wiki-librarian.md`) — a thin Sonnet wrapper that loads the same `wiki-librarian` skill Hermes uses, so both runtimes follow one procedure.
 
 Used for: compiling, analysis, cross-linking, health checks. Quality-critical work on the Pro subscription.
 
@@ -211,19 +210,19 @@ All in `0 - System/scripts/` (plus `youtube-fetch.py` and `list_tags.sh` in `0 -
 |--------|------|
 | `vaultlib.py` | shared helpers: privacy rules, frontmatter, wikilink resolution, backups |
 | `privacy_guard.py` | **the** privacy policy — one implementation, one thin wrapper per runtime; `--selftest` proves it |
-| `autolink.py` | bidirectional note↔wiki auto-linking |
 | `build_index.py` / `build_manifest.py` | regenerate `index.md` / `.manifest.json` from page frontmatter |
 | `append_log.py` | append-only `log.md` entries |
 | `fix_frontmatter.py` | normalize dates, backgrounds, required fields |
 | `validate.py` / `wiki_sources_report.py` | health checks: broken links, schema violations, bad sources |
-| `okf_migrate.py` / `okf_verify.py` | migrate frontmatter to OKF v0.2; stamp and audit the `verified` trust layer |
+| `okf_verify.py` | stamp and audit the `verified` trust layer |
 | `embed_index.py` / `vsearch.py` / `reindex.sh` | build, query and incrementally update the semantic index |
 | `subject_candidates.py` | suggest concepts worth promoting to a SCHEMA subject |
 | `safe_input.py` | the semantic index's input boundary: a positive folder allowlist, checked before any file is opened |
 | `test_safe_index.py` | privacy regression tests for the index, run against a throwaway fixture vault |
-| `vault-python.sh` | run the search scripts in an isolated, pinned Python environment (host or Docker) |
-| `gen_graphifyignore.py` | generate a static, privacy-safe ignore file for graph-style indexers |
-| `merge_nodes.py` | merge agent-authored nodes into a graphify graph (kept for anyone who still runs one) |
+| `test_privacy_boundary.py` | the guard, the index and `vaultlib` agree on one boundary: malformed headers, symlinks, the retired flag |
+| `test_librarian_bookkeeping.py` / `test_librarian_sync.py` | the bookkeeping scripts and the skill sync refuse unavailable targets before reading or writing |
+| `vault-python.sh` | run the search scripts in an isolated, pinned Python environment (host or Docker); never installs on its own — `--setup` prepares it explicitly |
+| `audit.py` (in the `wiki-librarian` skill's `scripts/`) | read-only structural wiki audit: pages, index coverage, fields, links |
 | `sync_skills_to_hermes.py` | regenerate `hermes-skills/` (agentskills.io format) from the SKILL files |
 | `publish_check.py` / `publish_port.py` | detect drift against the public mirror and port the mechanical parts; leak audit |
 | `trim_cache.py` | session-cache rotation |
@@ -245,10 +244,9 @@ search (everything embedding-related runs on-device). The search scripts run thr
 `vault-python.sh`, which builds an isolated venv from `vault-search-requirements.txt` (pinned
 numpy + PyYAML) on first use; the other scripts need `pip install pyyaml`.
 `pip install youtube-transcript-api` for the YouTube pipeline.
-`pip install youtube-transcript-api` for the YouTube pipeline.
 
-Already have a vault with frontmatter? `python3 "0 - System/scripts/okf_migrate.py"` shows what
-OKF v0.2 would change without writing anything.
+Already have a vault with frontmatter? `python3 "0 - System/scripts/validate.py"` reports what doesn't
+match the schema, and `fix_frontmatter.py` (dry-run by default) normalizes it.
 
 ## Companion Repos
 
@@ -262,8 +260,8 @@ exists to keep private. Each lives on its own:
 - [personal-stylist-agent](https://github.com/OferBlum/personal-stylist-agent) — the wardrobe/stylist skill
 - [automated-private-journaling-agent](https://github.com/OferBlum/automated-private-journaling-agent) — local-only journal summarization
 
-Adding one back is three edits: a `SKILL-*.md` file, a row in `skills-index.md`, and a route in
-`AGENTS.md`. That is the whole extension model.
+Adding one back is two edits: a `SKILL-*.md` file and a row in `skills-index.md` (`AGENTS.md`
+points every agent at that catalog). That is the whole extension model.
 
 ## License
 

@@ -16,6 +16,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
+
+def require_public_target(path):
+    """Reject unavailable targets before body reads, backups or replacement."""
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents) or V.is_forbidden(path):
+        raise SystemExit("Unavailable bookkeeping target; operation refused.")
+
 INDEX = V.WIKI / "index.md"
 APPLY = "--apply" in sys.argv
 
@@ -25,6 +31,7 @@ DATE_ALIASES = ("date updated", "date created")
 def index_descriptions():
     """name(stem) -> description, from the table in the old index.md."""
     out = {}
+    require_public_target(INDEX)
     if not INDEX.exists():
         return out
     for line in INDEX.read_text(encoding="utf-8").splitlines():
@@ -76,6 +83,9 @@ def main():
     desc_map = index_descriptions()
     planned, touched_paths = [], []
     for p, meta, body in V.iter_wiki_pages():
+        if V.has_broken_header(meta, body):
+            print(f"⚠️  malformed header — skipping, fix it by hand: {V.nfc(p.stem)}")
+            continue
         before = V.render_page(dict(meta), body)
         changes = fix_one(meta, desc_map, p.stem)
         after = V.render_page(meta, body)
@@ -97,8 +107,11 @@ def main():
         print("\nℹ️  Nothing was written. For a real run: python3 fix_frontmatter.py --apply")
         return
 
+    for p in touched_paths:
+        require_public_target(p)
     dest = V.backup(touched_paths, "frontmatter")
     for p, _, meta, body in planned:
+        require_public_target(p)
         p.write_text(V.render_page(meta, body), encoding="utf-8")
     print(f"\n✅ Wrote {len(planned)} pages. Backup: {V.rel(dest)}")
 

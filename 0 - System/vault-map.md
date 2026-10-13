@@ -25,7 +25,7 @@ User identity: [[me]]. Full working rules: [[CLAUDE]]. Skill catalog: [[skills-i
 | `4 - Templates/` | templates for creating notes | Don't modify; use as the base for new notes |
 | `5 - Tables/` | `.base` (dataview) files per subject | Don't modify |
 | `6 - Images/` | image assets | Don't modify |
-| `7 - Wikipedia/` | the compiled wiki (pages you write and maintain) | Write/maintain per SKILL-ingest/resolve |
+| `7 - Wikipedia/` | the compiled wiki (pages you write and maintain) | Write/maintain per the `wiki-librarian` skill |
 | `7 - Wikipedia/raw/` | raw sources (transcripts, PDFs) | ⛔ Don't change — immutable source |
 
 ## Privacy boundaries (above everything)

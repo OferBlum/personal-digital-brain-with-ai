@@ -1,4 +1,5 @@
-"""Isolated privacy regression tests for the folder boundary; never point these at the real vault."""
+"""Isolated header/folder privacy tests; never point these at the real vault."""
+import contextlib
 import json
 import os
 import pathlib
@@ -10,7 +11,11 @@ from unittest.mock import patch
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
-from privacy_guard import PRIVATE_DIR, is_blocked  # noqa: E402
+# Synthetic denial fixture; never create or touch the real protected area.
+PRIVATE_DIR = '9 - synthetic'
+
+def folder_blocked(path):
+    return PRIVATE_DIR in pathlib.Path(str(path)).parts
 
 
 class StubOllama:
@@ -39,7 +44,7 @@ class FolderBoundaryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.root = pathlib.Path(self.tmp.name) / 'fixture'
+        self.root = pathlib.Path(self.tmp.name).resolve() / 'fixture'
         (self.root / '2 - Notes').mkdir(parents=True)
         (self.root / PRIVATE_DIR / 'journal').mkdir(parents=True)
         self.secret = self.root / PRIVATE_DIR / 'journal' / 'day.md'
@@ -65,15 +70,15 @@ class FolderBoundaryTests(unittest.TestCase):
         real_scandir, real_open, real_io_open = os.scandir, builtins.open, io.open
 
         def spy_scandir(path='.', *a, **kw):
-            if is_blocked(path): touched.append(('list', str(path)))
+            if folder_blocked(path): touched.append(('list', str(path)))
             return real_scandir(path, *a, **kw)
 
         def spy_open(file, *a, **kw):
-            if is_blocked(file): touched.append(('open', str(file)))
+            if folder_blocked(file): touched.append(('open', str(file)))
             return real_open(file, *a, **kw)
 
         def spy_io_open(file, *a, **kw):
-            if is_blocked(file): touched.append(('open', str(file)))
+            if folder_blocked(file): touched.append(('open', str(file)))
             return real_io_open(file, *a, **kw)
 
         with patch.dict(os.environ, self.env):
@@ -89,17 +94,23 @@ class FolderBoundaryTests(unittest.TestCase):
         self.assertEqual(paths, ['2 - Notes/safe.md'])
         self.assertEqual(touched, [])
 
-    def test_retired_flag_is_indexed_and_private_folder_is_not(self):
+    def test_flagged_file_indexed_but_private_folder_and_raw_excluded(self):
         flagged = self.root / '2 - Notes' / 'flagged.md'
         flagged.write_text('---\nprivate: true\n---\n' + 'semantic alpha flagged ' * 12)
+        raw = self.root / '7 - Wikipedia' / 'raw' / 'source.md'
+        raw.parent.mkdir(parents=True)
+        raw.write_text('semantic alpha rawsource ' * 12)
         self.env['OLLAMA_HOST'] = StubOllama(self).url
         result = self.cli('embed_index.py')
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         hit = self.cli('vsearch.py', 'semantic alpha', '--json')
         self.assertEqual(hit.returncode, 0, hit.stderr)
         self.assertEqual(sorted(json.loads(hit.stdout)), ['2 - Notes/flagged.md', '2 - Notes/safe.md'])
-        chunks = (self.root / 'vector-out').rglob('chunks.jsonl')
-        self.assertNotIn('diary', ''.join(c.read_text() for c in chunks))
+        chunks = list((self.root / 'vector-out').rglob('chunks.jsonl'))
+        indexed = ''.join(c.read_text() for c in chunks)
+        self.assertNotIn('diary', indexed)
+        self.assertNotIn('rawsource', indexed)
+        self.assertIn('flagged', indexed)
         for option in ('--status', '--changes', '--check', '--audit'):
             out = self.cli('embed_index.py', option)
             self.assertEqual(out.returncode, 0, out.stderr)
@@ -150,6 +161,18 @@ class FolderBoundaryTests(unittest.TestCase):
         self.env['OLLAMA_HOST'] = stub
         result = self.cli('vsearch.py', 'semantic', '--json')
         self.assertEqual(json.loads(result.stdout), ['2 - Notes/safe.md'], result.stderr)
+
+    def test_successful_build_prunes_superseded_generations(self):
+        self.env['OLLAMA_HOST'] = StubOllama(self).url
+        out = self.root / 'vector-out'
+        self.assertEqual(self.cli('embed_index.py').returncode, 0)
+        first = {d.name for d in out.iterdir() if d.is_dir()}
+        self.note.write_text('a revised semantic note ' * 10)
+        self.assertEqual(self.cli('embed_index.py').returncode, 0)
+        active = json.loads((out / 'active.json').read_text())['generation']
+        remaining = {d.name for d in out.iterdir() if d.is_dir()}
+        self.assertEqual(remaining, {active})
+        self.assertNotEqual(remaining, first)
 
 
 if __name__ == '__main__':

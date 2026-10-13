@@ -36,7 +36,8 @@ for every agent — read, write, memory, index — and is never even **listed**.
 
 Enforced in code by **one** implementation — `0 - System/scripts/privacy_guard.py` — with a
 thin wrapper per runtime (`.claude/privacy-guard.py` fails closed,
-`~/.hermes/agent-hooks/privacy-guard.py` fails open). That matters: when each runtime had its own
+`~/.hermes/agent-hooks/privacy-guard.py` also fails closed, returning a JSON block decision
+with exit 0). That matters: when each runtime had its own
 guard they drifted, and the vault was only as private as its weakest agent. One file, every
 agent, same policy.
 
@@ -71,11 +72,11 @@ On top of that, a trust layer that separates *who made this* from *who checked i
 unverified, which is the honest default — stamp it with `okf_verify.py` once you've actually
 read the page.
 
-## Linking notes ↔ wiki (fixed method, since 2026-07-09)
+## Linking notes ↔ wiki
 My notes and the compiled pages are connected in two layers:
-- **In the files**: `autolink.py` scans bidirectionally — a mention of a wiki page inside a note becomes a [[link]] and vice versa. Runs after every compile, and at the start of every Claude Code session it offers to connect new mentions.
+- **In the files**: on request, the librarian finds candidates with semantic search, reads each one, and adds only the links that help (`wiki-librarian` → `references/crosslink.md`). Linking to a note never edits it, and there is no automatic bulk linking.
 - **In meaning**: the semantic index holds notes, topics and wiki pages in one space, so a search finds my note and the compiled knowledge about it together.
-- **Name collision** (a note and a wiki page with the same name): the wiki page wins — Claude offers to rename the note.
+- **Name collision** (a note and a wiki page with the same name): link by full vault path with an alias; nothing wins by default and nothing is renamed.
 - The private folder stays out of all of this; `_` files are skipped as generated, not withheld as secret.
 
 *The knowledge graph that used to sit here (graphify, with its own refresh policy) was removed — the two layers above cover what it was used for. Don't rebuild it.*

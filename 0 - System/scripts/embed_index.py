@@ -13,9 +13,9 @@ disposable file — the markdown is the truth. You can delete vector-out/ and re
 at any moment. At this size (~1,500 chunks) numpy does cosine over everything in
 under 10ms, so there is no reason to add faiss/chroma.
 
-Privacy: the boundary is folder-only (safe_input.py). Only top-level .md files of the
-allowlisted folders are read; the private folder is never read nor mapped. There is
-no frontmatter flag.
+Privacy: the boundary is folder-only (safe_input.py) — top level of 1/2/7, no raw/.
+The private folder and symlinks are blocked; a private flag in frontmatter has no
+effect on indexing. Indexes built under an earlier policy stay opaque.
 
 Usage:
     python3 "0 - System/scripts/embed_index.py"            # incremental build
@@ -23,14 +23,18 @@ Usage:
     python3 "0 - System/scripts/embed_index.py" --audit    # privacy check only
     python3 "0 - System/scripts/embed_index.py" --status   # index state
 """
-import sys, os, json, re, time, hashlib, argparse, urllib.request
+import sys, os, json, re, time, hashlib, argparse, shutil, urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 import numpy as np
 import safe_input as S
+import privacy_guard as G
 import uuid
+
+SCHEMA = 4
+PRIVACY_POLICY = 'folder-boundary-v1'
 
 OUT       = V.VAULT / "vector-out"
 VEC_PATH  = OUT / "vectors.npy"
@@ -75,18 +79,36 @@ def assert_private_excluded(paths):
     return ["🔴 path outside the indexing boundary" for x in paths if not S.permitted(V.rel(x))]
 
 def active():
-    """Legacy indexes are never read or displayed."""
+    """Preflight version AND every source header before any cached chunk body read.
+
+    Schema-3 and other policy generations are opaque, not per-record migrations.
+    Newly excluded sources make even a current generation unavailable. Search uses
+    this entry point, so it cannot load old bodies first and filter them afterward.
+    """
     try:
-        pointer = json.loads((OUT / 'active.json').read_text(encoding='utf-8'))
+        pointer_path = OUT / 'active.json'
+        if G.has_symlink(pointer_path):
+            return None, None
+        pointer = json.loads(G.read_public_page(pointer_path)[1])
         generation = pointer['generation']
-        if not re.fullmatch(r'[0-9a-f]{32}', generation):
-            raise ValueError('invalid generation')
+        if not isinstance(generation, str) or not re.fullmatch(r'[0-9a-f]{32}', generation):
+            return None, None
         base = OUT / generation
-        meta = json.loads((base / 'meta.json').read_text(encoding='utf-8'))
-        if meta.get('schema') != 3:
-            raise ValueError('legacy index')
+        meta_path = base / 'meta.json'
+        if any(G.has_symlink(base / name) for name in ('meta.json', 'chunks.jsonl', 'vectors.npy')):
+            return None, None
+        meta = json.loads(G.read_public_page(meta_path)[1])
+        if (not isinstance(meta, dict) or meta.get('schema') != SCHEMA
+                or meta.get('privacy_policy') != PRIVACY_POLICY):
+            return None, None
+        considered = meta.get('considered')
+        if not isinstance(considered, dict):
+            return None, None
+        if any(not isinstance(h, str) or not S.cache_permitted(rel)
+               for rel, h in considered.items()):
+            return None, None
         return base, meta
-    except (OSError, KeyError, ValueError, json.JSONDecodeError):
+    except (OSError, KeyError, ValueError, TypeError, RecursionError):
         return None, None
 
 
@@ -164,6 +186,8 @@ def body_hash(body):
 # ---------- build ----------
 
 def build(rebuild=False):
+    if G.has_symlink(OUT) or G.folder_blocked(OUT):
+        raise SystemExit('Index output unavailable')
     files = collect()
     problems = assert_private_excluded([p for p, _, _ in files])
     if any(x.startswith("🔴") for x in problems):
@@ -214,17 +238,28 @@ def build(rebuild=False):
     # permanent alert.
     considered = {V.rel(p): body_hash(b) for p, _, b in files}
     (dest / 'meta.json').write_text(json.dumps({
-        "schema": 3, "model": MODEL, "dim": int(mat.shape[1]), "chunks": len(records),
+        "schema": SCHEMA, "privacy_policy": PRIVACY_POLICY,
+        "model": MODEL, "dim": int(mat.shape[1]), "chunks": len(records),
         "files": len(files), "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "folders": ALLOWED_FOLDERS, "considered": considered,
     }, ensure_ascii=False, indent=2), encoding="utf-8")
     pointer = OUT / ('.active-' + generation)
     pointer.write_text(json.dumps({'generation': generation}), encoding='utf-8')
     os.replace(pointer, OUT / 'active.json')
+    prune_generations(keep=generation)
 
     for x in problems:
         print(x)
     print(f"✅ {len(records)} chunks · {mat.shape[1]} dims · {mat.nbytes/1e6:.1f}MB · {V.rel(OUT)}")
+
+
+def prune_generations(keep):
+    """Deletes old generations only after the pointer has moved to the new one. Derived
+    data only; touches only folders named as a generation id (32 hex), never symlinks."""
+    for d in OUT.iterdir():
+        if (d.name != keep and re.fullmatch(r'[0-9a-f]{32}', d.name)
+                and not d.is_symlink() and d.is_dir()):
+            shutil.rmtree(d, ignore_errors=True)
 
 
 def status():
@@ -275,8 +310,9 @@ def check():
 
 
 def changes():
-    """One path per change, line by line. Silent when the index is current — for reindex.sh.
-    + new · ~ changed · - deleted. Silence = nothing to do, which is what the script checks."""
+    """One count line per kind of change; never a filename. Silent when the index is
+    current — for reindex.sh. + new · ~ changed · - deleted. Silence = nothing to do,
+    which is what the script checks."""
     d = _diff()
     if d == "missing":
         print("! No semantic index — will build from scratch")
@@ -285,11 +321,11 @@ def changes():
         print("! The index was built by an old version — will rebuild")
         return
     added, gone, changed = d
-    for mark, paths in (("+", added), ("~", changed)):
-        for path in sorted(paths):
-            print(f"{mark} {path}")
-    for path in sorted(gone):
-        print(f"- {path}")
+    for mark, count, label in (('+', len(added), 'new eligible files'),
+                               ('~', len(changed), 'changed eligible files'),
+                               ('-', len(gone), 'removed files')):
+        if count:
+            print(f'{mark} {count} {label}')
 
 def audit():
     files = collect()
@@ -312,7 +348,7 @@ def main():
     ap.add_argument("--audit", action="store_true")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--check", action="store_true", help="silent unless the index is stale")
-    ap.add_argument("--changes", action="store_true", help="one path per changed file, line by line")
+    ap.add_argument("--changes", action="store_true", help="a count per kind of change, never filenames")
     args = ap.parse_args()
 
     if args.changes:

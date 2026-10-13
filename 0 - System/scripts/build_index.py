@@ -10,6 +10,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
+
+def require_public_target(path):
+    """Reject unavailable targets before body reads, backups or replacement."""
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents) or V.is_forbidden(path):
+        raise SystemExit("Unavailable bookkeeping target; operation refused.")
+
 INDEX = V.WIKI / "index.md"
 
 HEADER = [
@@ -26,6 +32,7 @@ def get_date(meta):
 def existing_descriptions():
     """name(stem) -> description from the current index, as a fallback so descriptions aren't lost."""
     out = {}
+    require_public_target(INDEX)
     if not INDEX.exists():
         return out
     for line in INDEX.read_text(encoding="utf-8").splitlines():
@@ -52,7 +59,9 @@ def main():
     for date, name, desc in rows:
         lines.append(f"| [[7 - Wikipedia/{name}]] | {desc} | {date} |")
 
+    require_public_target(INDEX)
     V.backup([INDEX], "index")
+    require_public_target(INDEX)
     INDEX.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"✅ Index written: {V.rel(INDEX)} ({len(rows)} pages)")

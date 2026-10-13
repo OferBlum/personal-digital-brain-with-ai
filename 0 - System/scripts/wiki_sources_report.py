@@ -10,18 +10,28 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vaultlib as V
 
+
+def require_public_target(path):
+    """Reject unavailable targets before body reads, backups or replacement."""
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents) or V.is_forbidden(path):
+        raise SystemExit("Unavailable bookkeeping target; operation refused.")
+
 REPORT = V.WIKI / "wiki_sources_issues.md"
 
 
 def classify(page_path, entry, md_index):
-    inner = entry.split("|")[0].strip()
-    if inner.startswith("[[") and inner.endswith("]]"):
-        inner = inner[2:-2].strip()
+    inner = str(entry).strip().removeprefix("[[").removesuffix("]]")
+    inner = inner.split("|")[0].split("#")[0].strip()
+    if inner.startswith(("http://", "https://")) or Path(inner).suffix.lower() not in ("", ".md"):
+        return ("⚪ not checked", "External URL or non-Markdown source: not validated by this report.")
     status, target = V.resolve_link(inner, md_index)
-    if status == "missing":
-        return ("🔴 missing target", f"`{inner}` — no such file")
-    if status == "ambiguous":
-        return ("🟠 ambiguous name", f"`{inner}` — several files with this name, needs a full path")
+    # Unresolved references can name excluded files. Never echo their names;
+    # absence from the public index cannot distinguish protected from missing.
+    if status != "ok" or target is None:
+        return ("⚪ target unavailable", "The target is not available for checking in the public index (missing/ambiguous/out of scope).")
+    target = Path(target)
+    if target.is_symlink() or any(p.is_symlink() for p in target.parents) or V.is_forbidden(target):
+        return ("⚪ target unavailable", "The target is not available for checking in the public index.")
     # ok — but it may point at itself or at another wiki page (not a real ingestion source)
     if V.nfc(str(target)) == V.nfc(str(page_path)):
         return ("🟣 self-reference", f"`{inner}` — the page lists itself as a source")
@@ -31,6 +41,7 @@ def classify(page_path, entry, md_index):
 
 
 def main():
+    require_public_target(REPORT)
     md_index = V.all_md_index()
     rows = []
     ok = 0
@@ -60,6 +71,7 @@ def main():
             lines.append(f"| [[7 - Wikipedia/{name}]] | {kind} | {detail} |")
     else:
         lines.append("✅ No problems — every wiki_sources entry is valid.")
+    require_public_target(REPORT)
     REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"✅ Valid entries: {ok}")
