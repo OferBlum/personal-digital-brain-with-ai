@@ -1,31 +1,9 @@
-# OS / editor noise
+# Umbrella repo: only the README and the design docs are published.
+# Everything else in this folder is local (agent config, the privacy hook) and stays untracked.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/CONTEXT.md
+!/docs/
 .DS_Store
-__pycache__/
-*.pyc
-
-# Obsidian app state (workspace history, plugin binaries, machine-local config)
-.obsidian/
-
-# Derived artifacts — regenerated locally
-graphify-out/
-vector-out/
-.graphifyignore
-7 - Wikipedia/.backup/
-7 - Wikipedia/.manifest.json
-7 - Wikipedia/validation_report.md
-7 - Wikipedia/wiki_sources_issues.md
-7 - Wikipedia/subject_candidates.md
-0 - System/_cache-archive.md
-
-# Private surfaces — never published
-# Note: graphify-out/, vector-out/ and .graphifyignore are above for a privacy reason,
-# not just because they are derived — each one enumerates real note paths or titles.
-3 - Journal/*
-!3 - Journal/.gitkeep
-home.html
-github-recovery-codes.txt
-0 - System/memories/*.lock
-
-# Local machine settings
-.claude/settings.local.json
-0 - System/publish-manifest.yaml
