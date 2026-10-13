@@ -4,6 +4,10 @@ The biggest advantage of AI is also its weakness: it knows everything, so its an
 fit **you**. My fix is a knowledge base with all of **my** data — my Obsidian vault. AI agents get
 access to it and become an assistant that knows about me.
 
+Technically, it's a **RAG** (retrieval-augmented generation) system. Before an agent answers, it
+finds the notes in my vault that fit the question and answers from them, not just from what the
+model already knows.
+
 > **I write the ideas, the agents read and enrich.**
 
 What it does:
@@ -24,7 +28,7 @@ repos. Each one shows one idea, and you can copy it on its own:
 | [vault-privacy-guard](https://github.com/OferBlum/vault-privacy-guard) | Privacy is a folder, not a flag. One policy file, and a hook that checks every tool call in every agent |
 | [okf-frontmatter-standard](https://github.com/OferBlum/okf-frontmatter-standard) | The metadata on top of each note: three closed fields (`type`, `subject`, `tags`), plus a mark for what the AI wrote and what I checked |
 | [llm-wiki-youtube-transcript](https://github.com/OferBlum/llm-wiki-youtube-transcript) | The Karpathy method: an agent turns each source (YouTube, articles, PDFs) into a linked wiki page |
-| [vault-semantic-search](https://github.com/OferBlum/vault-semantic-search) | Find notes by meaning in Hebrew and English, with a local index that never sees the private folder |
+| [vault-semantic-search](https://github.com/OferBlum/vault-semantic-search) | The retrieval part of the RAG. Find notes by meaning in Hebrew and English, with a local index that never sees the private folder |
 | [hermes-agent-layer](https://github.com/OferBlum/hermes-agent-layer) | A second agent, Hermes, on the same vault — no second copy of skills, memory or rules |
 
 ## How they fit together
